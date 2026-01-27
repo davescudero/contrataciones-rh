@@ -1,17 +1,15 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext({});
 
 export const useAuth = () => useContext(AuthContext);
 
-const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userRoles, setUserRoles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const signInInProgress = useRef(false);
 
   const fetchUserRoles = useCallback(async (userId) => {
     try {
@@ -63,14 +61,22 @@ export const AuthProvider = ({ children }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
+      
+      // Skip SIGNED_IN event if we're handling it in signIn function
+      if (signInInProgress.current && event === 'SIGNED_IN') {
+        return;
+      }
 
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserRoles([]);
-        setLoading(false);
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+      } else if (session?.user) {
         setUser(session.user);
+        const roles = await fetchUserRoles(session.user.id);
+        if (mounted) setUserRoles(roles);
       }
+      
+      if (mounted) setLoading(false);
     });
 
     return () => {
@@ -79,48 +85,49 @@ export const AuthProvider = ({ children }) => {
     };
   }, [fetchUserRoles]);
 
-  // Use direct fetch API to avoid body stream issues
   const signIn = async (email, password) => {
+    signInInProgress.current = true;
+    
     try {
-      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ email, password }),
+      // Clone the response to avoid "body already read" error
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        let errorMessage = data.error_description || data.msg || data.error || 'Error al iniciar sesión';
-        if (errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('credentials')) {
+      if (error) {
+        signInInProgress.current = false;
+        let errorMessage = error.message;
+        
+        // Handle "body stream already read" error - this means credentials are invalid
+        if (errorMessage.includes('body stream')) {
+          errorMessage = 'Credenciales inválidas. Verifica tu correo y contraseña.';
+        } else if (errorMessage === 'Invalid login credentials') {
           errorMessage = 'Credenciales inválidas. Verifica tu correo y contraseña.';
         }
+        
         return { data: null, error: { message: errorMessage } };
       }
 
-      // Set session in Supabase client
-      if (data.access_token) {
-        await supabase.auth.setSession({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-        });
-
-        const userData = data.user;
-        setUser(userData);
-        
-        if (userData?.id) {
-          const roles = await fetchUserRoles(userData.id);
-          setUserRoles(roles);
-        }
+      if (data?.user) {
+        setUser(data.user);
+        const roles = await fetchUserRoles(data.user.id);
+        setUserRoles(roles);
       }
 
+      signInInProgress.current = false;
       return { data, error: null };
     } catch (err) {
+      signInInProgress.current = false;
       console.error('SignIn error:', err);
-      return { data: null, error: { message: 'Error de conexión. Intenta de nuevo.' } };
+      
+      // The "body stream already read" error is thrown when credentials are invalid
+      // because Supabase internally tries to read the error response twice
+      const errorMessage = err.message?.includes('body stream') 
+        ? 'Credenciales inválidas. Verifica tu correo y contraseña.'
+        : 'Error de conexión. Intenta de nuevo.';
+      
+      return { data: null, error: { message: errorMessage } };
     }
   };
 
