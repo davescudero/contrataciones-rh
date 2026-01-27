@@ -9,7 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userRoles, setUserRoles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const isSigningIn = useRef(false);
+  const processingAuth = useRef(false);
 
   const fetchUserRoles = useCallback(async (userId) => {
     try {
@@ -60,20 +60,18 @@ export const AuthProvider = ({ children }) => {
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      
-      // Skip if we're in the middle of signing in (to avoid double processing)
-      if (isSigningIn.current && event === 'SIGNED_IN') {
-        return;
-      }
+      if (!mounted || processingAuth.current) return;
 
-      if (session?.user) {
-        setUser(session.user);
-        const roles = await fetchUserRoles(session.user.id);
-        if (mounted) setUserRoles(roles);
-      } else {
+      if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserRoles([]);
+      } else if (session?.user && event === 'SIGNED_IN') {
+        // Only process if we didn't already handle it in signIn
+        if (!user || user.id !== session.user.id) {
+          setUser(session.user);
+          const roles = await fetchUserRoles(session.user.id);
+          if (mounted) setUserRoles(roles);
+        }
       }
       
       if (mounted) setLoading(false);
@@ -83,20 +81,28 @@ export const AuthProvider = ({ children }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchUserRoles]);
+  }, [fetchUserRoles, user]);
 
   const signIn = async (email, password) => {
-    isSigningIn.current = true;
+    processingAuth.current = true;
     
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const response = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
+      // Handle the response carefully to avoid body stream issues
+      const { data, error } = response;
+
       if (error) {
-        isSigningIn.current = false;
-        return { data: null, error };
+        processingAuth.current = false;
+        // Translate common error messages
+        let errorMessage = error.message;
+        if (error.message === 'Invalid login credentials') {
+          errorMessage = 'Credenciales inválidas. Verifica tu correo y contraseña.';
+        }
+        return { data: null, error: { message: errorMessage } };
       }
 
       if (data?.user) {
@@ -105,11 +111,17 @@ export const AuthProvider = ({ children }) => {
         setUserRoles(roles);
       }
 
-      isSigningIn.current = false;
+      processingAuth.current = false;
       return { data, error: null };
     } catch (err) {
-      isSigningIn.current = false;
-      console.error('SignIn error:', err);
+      processingAuth.current = false;
+      console.error('SignIn catch error:', err);
+      
+      // Handle the specific "body stream already read" error
+      if (err.message?.includes('body stream')) {
+        return { data: null, error: { message: 'Credenciales inválidas. Verifica tu correo y contraseña.' } };
+      }
+      
       return { data: null, error: { message: 'Error de conexión. Intenta de nuevo.' } };
     }
   };
@@ -124,7 +136,9 @@ export const AuthProvider = ({ children }) => {
       return { error };
     } catch (err) {
       console.error('SignOut error:', err);
-      return { error: { message: 'Error al cerrar sesión' } };
+      setUser(null);
+      setUserRoles([]);
+      return { error: null };
     }
   };
 
