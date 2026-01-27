@@ -1,15 +1,17 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext({});
 
 export const useAuth = () => useContext(AuthContext);
 
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userRoles, setUserRoles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const processingAuth = useRef(false);
 
   const fetchUserRoles = useCallback(async (userId) => {
     try {
@@ -60,80 +62,74 @@ export const AuthProvider = ({ children }) => {
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted || processingAuth.current) return;
+      if (!mounted) return;
 
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserRoles([]);
-      } else if (session?.user && event === 'SIGNED_IN') {
-        // Only process if we didn't already handle it in signIn
-        if (!user || user.id !== session.user.id) {
-          setUser(session.user);
-          const roles = await fetchUserRoles(session.user.id);
-          if (mounted) setUserRoles(roles);
-        }
+        setLoading(false);
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        setUser(session.user);
       }
-      
-      if (mounted) setLoading(false);
     });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchUserRoles, user]);
+  }, [fetchUserRoles]);
 
+  // Use direct fetch API to avoid body stream issues
   const signIn = async (email, password) => {
-    processingAuth.current = true;
-    
     try {
-      const response = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ email, password }),
       });
 
-      // Handle the response carefully to avoid body stream issues
-      const { data, error } = response;
+      const data = await response.json();
 
-      if (error) {
-        processingAuth.current = false;
-        // Translate common error messages
-        let errorMessage = error.message;
-        if (error.message === 'Invalid login credentials') {
+      if (!response.ok) {
+        let errorMessage = data.error_description || data.msg || data.error || 'Error al iniciar sesión';
+        if (errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('credentials')) {
           errorMessage = 'Credenciales inválidas. Verifica tu correo y contraseña.';
         }
         return { data: null, error: { message: errorMessage } };
       }
 
-      if (data?.user) {
-        setUser(data.user);
-        const roles = await fetchUserRoles(data.user.id);
-        setUserRoles(roles);
+      // Set session in Supabase client
+      if (data.access_token) {
+        await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        });
+
+        const userData = data.user;
+        setUser(userData);
+        
+        if (userData?.id) {
+          const roles = await fetchUserRoles(userData.id);
+          setUserRoles(roles);
+        }
       }
 
-      processingAuth.current = false;
       return { data, error: null };
     } catch (err) {
-      processingAuth.current = false;
-      console.error('SignIn catch error:', err);
-      
-      // Handle the specific "body stream already read" error
-      if (err.message?.includes('body stream')) {
-        return { data: null, error: { message: 'Credenciales inválidas. Verifica tu correo y contraseña.' } };
-      }
-      
+      console.error('SignIn error:', err);
       return { data: null, error: { message: 'Error de conexión. Intenta de nuevo.' } };
     }
   };
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (!error) {
-        setUser(null);
-        setUserRoles([]);
-      }
-      return { error };
+      await supabase.auth.signOut();
+      setUser(null);
+      setUserRoles([]);
+      return { error: null };
     } catch (err) {
       console.error('SignOut error:', err);
       setUser(null);
