@@ -34,15 +34,18 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
 
-    const { error } = await signIn(data.email, data.password);
+    try {
+      const result = await signIn(data.email, data.password);
 
-    if (error) {
-      setError(error.message === 'Invalid login credentials' 
-        ? 'Credenciales inválidas. Verifica tu correo y contraseña.'
-        : error.message);
+      if (result.error) {
+        setError(result.error.message || 'Error al iniciar sesión');
+        setIsLoading(false);
+      } else {
+        navigate('/');
+      }
+    } catch (err) {
+      setError('Credenciales inválidas. Verifica tu correo y contraseña.');
       setIsLoading(false);
-    } else {
-      navigate('/');
     }
   };
 
