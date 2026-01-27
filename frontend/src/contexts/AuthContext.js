@@ -67,11 +67,16 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { data, error };
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { data, error };
+    } catch (err) {
+      console.error('SignIn error:', err);
+      return { data: null, error: { message: 'Error de conexión. Intenta de nuevo.' } };
+    }
   };
 
   const signOut = async () => {
