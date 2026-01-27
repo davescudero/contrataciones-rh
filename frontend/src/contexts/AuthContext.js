@@ -11,32 +11,40 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check active session
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await fetchUserRoles(session.user.id);
-      }
-      setLoading(false);
-    };
+  let mounted = true;
 
-    getSession();
+  const init = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!mounted) return;
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        await fetchUserRoles(session.user.id);
-      } else {
-        setUser(null);
-        setUserRoles([]);
-      }
-      setLoading(false);
-    });
+    if (session?.user) {
+      setUser(session.user);
+      await fetchUserRoles(session.user.id);
+    }
+    setLoading(false);
+  };
 
-    return () => subscription.unsubscribe();
-  }, []);
+  init();
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    if (!mounted) return;
+
+    if (session?.user) {
+      setUser(session.user);
+      await fetchUserRoles(session.user.id);
+    } else {
+      setUser(null);
+      setUserRoles([]);
+    }
+    setLoading(false);
+  });
+
+  return () => {
+    mounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
+
 
   const fetchUserRoles = async (userId) => {
     try {
