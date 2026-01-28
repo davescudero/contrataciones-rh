@@ -2,23 +2,31 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ROLES } from "./lib/constants";
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
-import CampaignsPage from "./pages/CampaignsPage";
+
+// Planeación
+import PlaneacionCampaignsPage from "./pages/planeacion/CampaignsPage";
+import CampaignDetailPage from "./pages/planeacion/CampaignDetailPage";
+
+// Atención a la Salud
+import AtencionSaludReviewPage from "./pages/atencion-salud/ReviewPage";
+
+// RH
+import RHCampaignsPage from "./pages/rh/CampaignsPage";
+import RHDashboardPage from "./pages/rh/DashboardPage";
+
+// Coordinación Estatal
+import CoordinacionProposalsPage from "./pages/coordinacion/ProposalsPage";
+
+// Validador
+import ValidadorValidationsPage from "./pages/validador/ValidationsPage";
+
+// DG
+import DGDashboardPage from "./pages/dg/DashboardPage";
+
 import "./App.css";
-
-// Placeholder pages for future implementation
-const PlaceholderPage = ({ title }) => (
-  <div className="bg-white border border-slate-200 rounded-lg p-12 text-center">
-    <h1 className="font-heading text-2xl font-bold text-slate-900 mb-2">{title}</h1>
-    <p className="font-body text-slate-500">Esta sección estará disponible próximamente.</p>
-  </div>
-);
-
-const ProposalsPage = () => <PlaceholderPage title="Propuestas" />;
-const ValidationsPage = () => <PlaceholderPage title="Validaciones" />;
-const HealthFacilitiesPage = () => <PlaceholderPage title="Unidades de Salud" />;
-const UsersPage = () => <PlaceholderPage title="Usuarios" />;
 
 // Redirect authenticated users away from login
 const PublicRoute = ({ children }) => {
@@ -48,7 +56,7 @@ function AppRoutes() {
         }
       />
 
-      {/* Protected Routes */}
+      {/* Protected Routes - Home */}
       <Route
         path="/"
         element={
@@ -59,52 +67,94 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      {/* Planeación Routes */}
       <Route
-        path="/campaigns"
+        path="/planeacion/campaigns"
         element={
-          <ProtectedRoute allowedRoles={['admin', 'hr_manager', 'state_coordinator', 'viewer']}>
+          <ProtectedRoute allowedRoles={[ROLES.PLANEACION]}>
             <Layout>
-              <CampaignsPage />
+              <PlaneacionCampaignsPage />
             </Layout>
           </ProtectedRoute>
         }
       />
       <Route
-        path="/proposals"
+        path="/planeacion/campaigns/:id"
         element={
-          <ProtectedRoute allowedRoles={['admin', 'hr_manager', 'validator', 'state_coordinator', 'viewer']}>
+          <ProtectedRoute allowedRoles={[ROLES.PLANEACION]}>
             <Layout>
-              <ProposalsPage />
+              <CampaignDetailPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Atención a la Salud Routes */}
+      <Route
+        path="/atencion-salud/review"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ATENCION_SALUD]}>
+            <Layout>
+              <AtencionSaludReviewPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* RH Routes */}
+      <Route
+        path="/rh/campaigns"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.RH]}>
+            <Layout>
+              <RHCampaignsPage />
             </Layout>
           </ProtectedRoute>
         }
       />
       <Route
-        path="/validations"
+        path="/rh/dashboard"
         element={
-          <ProtectedRoute allowedRoles={['admin', 'validator']}>
+          <ProtectedRoute allowedRoles={[ROLES.RH]}>
             <Layout>
-              <ValidationsPage />
+              <RHDashboardPage />
             </Layout>
           </ProtectedRoute>
         }
       />
+
+      {/* Coordinación Estatal Routes */}
       <Route
-        path="/health-facilities"
+        path="/coordinacion/proposals"
         element={
-          <ProtectedRoute allowedRoles={['admin', 'hr_manager', 'state_coordinator']}>
+          <ProtectedRoute allowedRoles={[ROLES.COORD_ESTATAL]}>
             <Layout>
-              <HealthFacilitiesPage />
+              <CoordinacionProposalsPage />
             </Layout>
           </ProtectedRoute>
         }
       />
+
+      {/* Validador Routes */}
       <Route
-        path="/users"
+        path="/validador/validations"
         element={
-          <ProtectedRoute allowedRoles={['admin']}>
+          <ProtectedRoute allowedRoles={[ROLES.VALIDADOR]}>
             <Layout>
-              <UsersPage />
+              <ValidadorValidationsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* DG Routes */}
+      <Route
+        path="/dg/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.DG]}>
+            <Layout>
+              <DGDashboardPage />
             </Layout>
           </ProtectedRoute>
         }

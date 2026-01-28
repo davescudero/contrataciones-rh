@@ -12,61 +12,67 @@ import {
 import { Toaster } from './ui/sonner';
 import { 
   LayoutDashboard, 
-  Megaphone, 
-  FileText, 
-  ClipboardCheck, 
-  Building2, 
-  Users,
+  ClipboardList,
+  Eye,
+  Megaphone,
+  BarChart3,
+  FileText,
+  CheckCircle,
   LogOut,
   User,
   Menu
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-
-const ROLE_LABELS = {
-  admin: 'Administrador',
-  hr_manager: 'Gestor de RH',
-  validator: 'Validador',
-  viewer: 'Visualizador',
-  state_coordinator: 'Coordinador Estatal',
-};
+import { ROLES, ROLE_LABELS } from '../lib/constants';
 
 const NAV_ITEMS = [
   {
     title: 'Inicio',
     href: '/',
     icon: LayoutDashboard,
-    roles: ['admin', 'hr_manager', 'validator', 'viewer', 'state_coordinator'],
+    roles: [ROLES.PLANEACION, ROLES.ATENCION_SALUD, ROLES.RH, ROLES.COORD_ESTATAL, ROLES.VALIDADOR, ROLES.DG],
   },
   {
     title: 'Campañas',
-    href: '/campaigns',
+    href: '/planeacion/campaigns',
+    icon: ClipboardList,
+    roles: [ROLES.PLANEACION],
+  },
+  {
+    title: 'Revisión',
+    href: '/atencion-salud/review',
+    icon: Eye,
+    roles: [ROLES.ATENCION_SALUD],
+  },
+  {
+    title: 'Activación',
+    href: '/rh/campaigns',
     icon: Megaphone,
-    roles: ['admin', 'hr_manager', 'state_coordinator', 'viewer'],
+    roles: [ROLES.RH],
+  },
+  {
+    title: 'Dashboard RH',
+    href: '/rh/dashboard',
+    icon: BarChart3,
+    roles: [ROLES.RH],
   },
   {
     title: 'Propuestas',
-    href: '/proposals',
+    href: '/coordinacion/proposals',
     icon: FileText,
-    roles: ['admin', 'hr_manager', 'validator', 'state_coordinator', 'viewer'],
+    roles: [ROLES.COORD_ESTATAL],
   },
   {
     title: 'Validaciones',
-    href: '/validations',
-    icon: ClipboardCheck,
-    roles: ['admin', 'validator'],
+    href: '/validador/validations',
+    icon: CheckCircle,
+    roles: [ROLES.VALIDADOR],
   },
   {
-    title: 'Unidades de Salud',
-    href: '/health-facilities',
-    icon: Building2,
-    roles: ['admin', 'hr_manager', 'state_coordinator'],
-  },
-  {
-    title: 'Usuarios',
-    href: '/users',
-    icon: Users,
-    roles: ['admin'],
+    title: 'Dashboard DG',
+    href: '/dg/dashboard',
+    icon: BarChart3,
+    roles: [ROLES.DG],
   },
 ];
 
@@ -99,18 +105,18 @@ export const Layout = ({ children }) => {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1" data-testid="main-nav">
-              {visibleNavItems.map((item) => (
+            <nav className="hidden lg:flex items-center gap-1" data-testid="main-nav">
+              {visibleNavItems.slice(0, 6).map((item) => (
                 <Link
                   key={item.href}
                   to={item.href}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                    location.pathname === item.href
+                    location.pathname === item.href || location.pathname.startsWith(item.href + '/')
                       ? "bg-slate-100 text-slate-900"
                       : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   )}
-                  data-testid={`nav-${item.href.replace('/', '') || 'home'}`}
+                  data-testid={`nav-${item.href.replace(/\//g, '-').slice(1) || 'home'}`}
                 >
                   <item.icon className="w-4 h-4" strokeWidth={1.5} />
                   {item.title}
@@ -122,7 +128,7 @@ export const Layout = ({ children }) => {
             <div className="flex items-center gap-2">
               {/* Mobile Menu */}
               <DropdownMenu>
-                <DropdownMenuTrigger asChild className="md:hidden">
+                <DropdownMenuTrigger asChild className="lg:hidden">
                   <Button variant="ghost" size="icon" data-testid="mobile-menu-btn">
                     <Menu className="w-5 h-5" />
                   </Button>
