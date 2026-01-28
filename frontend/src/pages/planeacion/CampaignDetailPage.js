@@ -353,6 +353,10 @@ export default function CampaignDetailPage() {
 
   // Validator handlers
   const handleAddValidators = async () => {
+    console.log('=== handleAddValidators called ===');
+    console.log('selectedPositionForValidator:', selectedPositionForValidator);
+    console.log('selectedValidatorUnits:', selectedValidatorUnits);
+    
     if (!selectedPositionForValidator || selectedValidatorUnits.length === 0) {
       toast.error('Selecciona una posición y al menos una unidad validadora');
       return;
@@ -360,28 +364,45 @@ export default function CampaignDetailPage() {
     setAddingValidators(true);
     try {
       let successCount = 0;
+      let errorCount = 0;
+      
       for (const unitId of selectedValidatorUnits) {
-        const { error } = await supabase
-          .from('campaign_validators')
-          .insert({
-            campaign_id: id,
-            campaign_position_id: selectedPositionForValidator,
-            validator_unit_id: unitId,
-            is_required: true,
-          });
-        if (!error) successCount++;
+        try {
+          const { error } = await supabase
+            .from('campaign_validators')
+            .insert({
+              campaign_id: id,
+              campaign_position_id: selectedPositionForValidator,
+              validator_unit_id: unitId,
+              is_required: true,
+            });
+          
+          if (error) {
+            console.error('Insert validator error:', error);
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (e) {
+          console.error('Exception inserting validator:', e);
+          errorCount++;
+        }
       }
 
       if (successCount > 0) {
-        toast.success(`${successCount} validadores asignados`);
-        setValidatorDialogOpen(false);
-        setSelectedPositionForValidator('');
-        setSelectedValidatorUnits([]);
-        await refreshCampaignValidators();
+        toast.success(`${successCount} validador(es) asignado(s)`);
       }
+      if (errorCount > 0) {
+        toast.error(`${errorCount} no pudieron ser asignados`);
+      }
+      
+      setValidatorDialogOpen(false);
+      setSelectedPositionForValidator('');
+      setSelectedValidatorUnits([]);
+      await refreshCampaignValidators();
     } catch (err) {
       console.error('Error adding validators:', err);
-      toast.error('Error al asignar validadores');
+      toast.error('Error al asignar validadores: ' + (err.message || ''));
     } finally {
       setAddingValidators(false);
     }
