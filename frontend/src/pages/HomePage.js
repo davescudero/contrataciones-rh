@@ -74,6 +74,12 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8" data-testid="home-page">
+      {/* Debug Info */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 font-mono text-xs" data-testid="debug-info">
+        <p><strong>DEBUG - User ID:</strong> {user?.id || 'N/A'}</p>
+        <p><strong>DEBUG - Email:</strong> {user?.email || 'N/A'}</p>
+      </div>
+
       {/* Welcome Section */}
       <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
         <div className="flex items-center gap-4">
