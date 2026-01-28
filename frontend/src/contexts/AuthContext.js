@@ -12,6 +12,8 @@ export const AuthProvider = ({ children }) => {
   const signInInProgress = useRef(false);
 
   const fetchUserRoles = useCallback(async (userId) => {
+    console.log('=== DEBUG: Fetching roles for user_id:', userId);
+    
     try {
       const { data, error } = await supabase
         .from('user_roles')
@@ -25,14 +27,21 @@ export const AuthProvider = ({ children }) => {
         `)
         .eq('user_id', userId);
 
+      console.log('=== DEBUG: user_roles query result:');
+      console.log('  - Raw data:', JSON.stringify(data, null, 2));
+      console.log('  - Error:', error ? JSON.stringify(error, null, 2) : 'none');
+
       if (error) {
         console.error('Error fetching user roles:', error);
         return [];
       }
 
-      return data?.map(ur => ur.roles?.name).filter(Boolean) || [];
+      const roles = data?.map(ur => ur.roles?.name).filter(Boolean) || [];
+      console.log('=== DEBUG: Extracted role names:', roles);
+      
+      return roles;
     } catch (err) {
-      console.error('Error fetching roles:', err);
+      console.error('=== DEBUG: Catch error fetching roles:', err);
       return [];
     }
   }, []);
