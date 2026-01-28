@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,8 +23,8 @@ import { Skeleton } from '../../components/ui/skeleton';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { toast } from 'sonner';
 import { 
-  ArrowLeft, Save, Send, Plus, Trash2, Loader2, AlertCircle, 
-  Briefcase, Building2, UserCheck, Lock, Upload, FileText
+  ArrowLeft, Save, Send, Plus, Trash2, Loader2, 
+  Briefcase, Building2, UserCheck, Lock, Upload
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABELS, ROLES } from '../../lib/constants';
 
@@ -62,103 +62,102 @@ export default function CampaignDetailPage() {
   const isEditable = campaign?.status === CAMPAIGN_STATUS.DRAFT;
   const canEdit = hasRole(ROLES.PLANEACION) && isEditable;
 
-  const fetchCampaign = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('campaigns')
-        .select('*')
-        .eq('id', id)
-        .single();
+  // Load all data on mount
+  useEffect(() => {
+    let isMounted = true;
 
-      if (error) throw error;
-      setCampaign(data);
-    } catch (err) {
-      console.error('Error fetching campaign:', err);
-      toast.error('Error al cargar la campaña');
-      navigate('/planeacion/campaigns');
-    }
+    const loadAllData = async () => {
+      setLoading(true);
+      
+      try {
+        // Fetch campaign
+        const { data: campaignData, error: campaignError } = await supabase
+          .from('campaigns')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (campaignError) {
+          console.error('Error fetching campaign:', campaignError);
+          toast.error('Error al cargar la campaña');
+          navigate('/planeacion/campaigns');
+          return;
+        }
+
+        if (isMounted) setCampaign(campaignData);
+
+        // Fetch positions catalog
+        const { data: positionsData } = await supabase
+          .from('positions_catalog')
+          .select('*')
+          .order('name');
+        if (isMounted) setPositions(positionsData || []);
+
+        // Fetch campaign positions
+        const { data: cpData } = await supabase
+          .from('campaign_positions')
+          .select('*, positions_catalog(*)')
+          .eq('campaign_id', id);
+        if (isMounted) setCampaignPositions(cpData || []);
+
+        // Fetch authorized facilities
+        const { data: afData } = await supabase
+          .from('campaign_authorized_facilities')
+          .select('*, health_facilities(*)')
+          .eq('campaign_id', id);
+        if (isMounted) setAuthorizedFacilities(afData || []);
+
+        // Fetch validator units
+        const { data: vuData } = await supabase
+          .from('validator_units')
+          .select('*')
+          .order('name');
+        if (isMounted) setValidatorUnits(vuData || []);
+
+        // Fetch campaign validators
+        const { data: cvData } = await supabase
+          .from('campaign_validators')
+          .select('*, validator_units(*), campaign_positions(*, positions_catalog(*))')
+          .eq('campaign_id', id);
+        if (isMounted) setCampaignValidators(cvData || []);
+
+      } catch (err) {
+        console.error('Error loading data:', err);
+        toast.error('Error al cargar datos');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadAllData();
+
+    return () => { isMounted = false; };
   }, [id, navigate]);
 
-  const fetchPositionsCatalog = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('positions_catalog')
-        .select('*')
-        .order('name');
-      if (error) throw error;
-      setPositions(data || []);
-    } catch (err) {
-      console.error('Error fetching positions:', err);
-    }
+  // Refresh functions (called after mutations)
+  const refreshCampaignPositions = async () => {
+    const { data } = await supabase
+      .from('campaign_positions')
+      .select('*, positions_catalog(*)')
+      .eq('campaign_id', id);
+    setCampaignPositions(data || []);
   };
 
-  const fetchCampaignPositions = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('campaign_positions')
-        .select('*, positions_catalog(*)')
-        .eq('campaign_id', id);
-      if (error) throw error;
-      setCampaignPositions(data || []);
-    } catch (err) {
-      console.error('Error fetching campaign positions:', err);
-    }
-  }, [id]);
-
-  const fetchAuthorizedFacilities = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('campaign_authorized_facilities')
-        .select('*, health_facilities(*)')
-        .eq('campaign_id', id);
-      if (error) throw error;
-      setAuthorizedFacilities(data || []);
-    } catch (err) {
-      console.error('Error fetching facilities:', err);
-    }
-  }, [id]);
-
-  const fetchValidatorUnits = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('validator_units')
-        .select('*')
-        .order('name');
-      if (error) throw error;
-      setValidatorUnits(data || []);
-    } catch (err) {
-      console.error('Error fetching validator units:', err);
-    }
+  const refreshAuthorizedFacilities = async () => {
+    const { data } = await supabase
+      .from('campaign_authorized_facilities')
+      .select('*, health_facilities(*)')
+      .eq('campaign_id', id);
+    setAuthorizedFacilities(data || []);
   };
 
-  const fetchCampaignValidators = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('campaign_validators')
-        .select('*, validator_units(*), campaign_positions(*, positions_catalog(*))')
-        .eq('campaign_id', id);
-      if (error) throw error;
-      setCampaignValidators(data || []);
-    } catch (err) {
-      console.error('Error fetching campaign validators:', err);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([
-        fetchCampaign(),
-        fetchPositionsCatalog(),
-        fetchCampaignPositions(),
-        fetchAuthorizedFacilities(),
-        fetchValidatorUnits(),
-        fetchCampaignValidators(),
-      ]);
-      setLoading(false);
-    };
-    loadData();
-  }, [fetchCampaign, fetchCampaignPositions, fetchAuthorizedFacilities, fetchCampaignValidators]);
+  const refreshCampaignValidators = async () => {
+    const { data } = await supabase
+      .from('campaign_validators')
+      .select('*, validator_units(*), campaign_positions(*, positions_catalog(*))')
+      .eq('campaign_id', id);
+    setCampaignValidators(data || []);
+  };
 
   const handleSaveName = async () => {
     if (!campaign?.name?.trim()) {
@@ -175,7 +174,7 @@ export default function CampaignDetailPage() {
       toast.success('Campaña actualizada');
     } catch (err) {
       console.error('Error saving campaign:', err);
-      toast.error('Error al guardar: ' + (err.message || 'Error desconocido'));
+      toast.error('Error al guardar: ' + (err.message || ''));
     } finally {
       setSaving(false);
     }
@@ -199,16 +198,16 @@ export default function CampaignDetailPage() {
         .eq('id', id);
       if (error) throw error;
       toast.success('Campaña enviada a revisión');
-      fetchCampaign();
+      setCampaign(prev => ({ ...prev, status: CAMPAIGN_STATUS.UNDER_REVIEW }));
     } catch (err) {
       console.error('Error submitting campaign:', err);
-      toast.error('Error al enviar a revisión: ' + (err.message || 'Error desconocido'));
+      toast.error('Error al enviar a revisión: ' + (err.message || ''));
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Positions handlers
+  // Position handlers
   const handleAddPosition = async () => {
     if (!selectedPosition || !slotsAuthorized) {
       toast.error('Selecciona una posición y define las plazas autorizadas');
@@ -228,10 +227,10 @@ export default function CampaignDetailPage() {
       setPositionDialogOpen(false);
       setSelectedPosition('');
       setSlotsAuthorized('');
-      fetchCampaignPositions();
+      await refreshCampaignPositions();
     } catch (err) {
       console.error('Error adding position:', err);
-      toast.error('Error al agregar posición: ' + (err.message || 'Error desconocido'));
+      toast.error('Error al agregar posición: ' + (err.message || ''));
     } finally {
       setAddingPosition(false);
     }
@@ -245,34 +244,31 @@ export default function CampaignDetailPage() {
         .eq('id', positionId);
       if (error) throw error;
       toast.success('Posición eliminada');
-      fetchCampaignPositions();
-      fetchCampaignValidators();
+      await refreshCampaignPositions();
+      await refreshCampaignValidators();
     } catch (err) {
       console.error('Error removing position:', err);
-      toast.error('Error al eliminar posición: ' + (err.message || 'Error desconocido'));
+      toast.error('Error al eliminar: ' + (err.message || ''));
     }
   };
 
   // CLUES handlers
-  const handleValidateClues = async (cluesText) => {
-    const textToProcess = cluesText || cluesInput;
-    const cluesList = textToProcess.split(/[\n,;]+/).map(c => c.trim().toUpperCase()).filter(Boolean);
+  const processClues = async (cluesText) => {
+    const cluesList = cluesText.split(/[\n,;]+/).map(c => c.trim().toUpperCase()).filter(Boolean);
     
     if (cluesList.length === 0) {
-      toast.error('Ingresa al menos una CLUES');
+      toast.error('No se encontraron CLUES válidas');
       return;
     }
 
     setValidatingClues(true);
     try {
-      // Validate CLUES exist in health_facilities
       const { data: validFacilities, error } = await supabase
         .from('health_facilities')
         .select('id, clues, name')
         .in('clues', cluesList);
 
       if (error) {
-        console.error('Error querying health_facilities:', error);
         toast.error('Error al buscar CLUES: ' + error.message);
         return;
       }
@@ -281,54 +277,28 @@ export default function CampaignDetailPage() {
       const invalidClues = cluesList.filter(c => !validClues.includes(c));
 
       if (invalidClues.length > 0) {
-        toast.error(`CLUES no encontradas (${invalidClues.length}): ${invalidClues.slice(0, 5).join(', ')}${invalidClues.length > 5 ? '...' : ''}`);
+        toast.error(`CLUES no encontradas (${invalidClues.length}): ${invalidClues.slice(0, 3).join(', ')}...`);
       }
 
       if (validFacilities && validFacilities.length > 0) {
-        // Insert valid facilities one by one to avoid constraint issues
         let successCount = 0;
-        let errorCount = 0;
-
         for (const facility of validFacilities) {
-          try {
-            const { error: insertError } = await supabase
-              .from('campaign_authorized_facilities')
-              .insert({
-                campaign_id: id,
-                facility_id: facility.id,
-              });
-
-            if (insertError) {
-              // Check if it's a duplicate error
-              if (insertError.code === '23505') {
-                // Already exists, skip
-              } else {
-                console.error('Insert error:', insertError);
-                errorCount++;
-              }
-            } else {
-              successCount++;
-            }
-          } catch (e) {
-            errorCount++;
-          }
+          const { error: insertError } = await supabase
+            .from('campaign_authorized_facilities')
+            .insert({ campaign_id: id, facility_id: facility.id });
+          
+          if (!insertError) successCount++;
         }
         
         if (successCount > 0) {
-          toast.success(`${successCount} CLUES agregadas exitosamente`);
+          toast.success(`${successCount} CLUES agregadas`);
+          setCluesInput('');
+          await refreshAuthorizedFacilities();
         }
-        if (errorCount > 0) {
-          toast.error(`${errorCount} CLUES no pudieron ser agregadas`);
-        }
-        
-        setCluesInput('');
-        fetchAuthorizedFacilities();
-      } else if (invalidClues.length === 0) {
-        toast.info('No se encontraron CLUES para agregar');
       }
     } catch (err) {
-      console.error('Error validating CLUES:', err);
-      toast.error('Error al validar CLUES: ' + (err.message || 'Error desconocido'));
+      console.error('Error processing CLUES:', err);
+      toast.error('Error al procesar CLUES');
     } finally {
       setValidatingClues(false);
     }
@@ -338,25 +308,14 @@ export default function CampaignDetailPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.txt') && !file.name.endsWith('.csv')) {
-      toast.error('Solo se permiten archivos .txt o .csv');
-      return;
-    }
-
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const content = event.target?.result;
       if (typeof content === 'string') {
-        // Process the file content
-        await handleValidateClues(content);
+        processClues(content);
       }
     };
-    reader.onerror = () => {
-      toast.error('Error al leer el archivo');
-    };
     reader.readAsText(file);
-    
-    // Reset the input
     e.target.value = '';
   };
 
@@ -368,14 +327,14 @@ export default function CampaignDetailPage() {
         .eq('id', facilityId);
       if (error) throw error;
       toast.success('CLUES eliminada');
-      fetchAuthorizedFacilities();
+      await refreshAuthorizedFacilities();
     } catch (err) {
       console.error('Error removing facility:', err);
-      toast.error('Error al eliminar CLUES: ' + (err.message || 'Error desconocido'));
+      toast.error('Error al eliminar: ' + (err.message || ''));
     }
   };
 
-  // Validators handlers
+  // Validator handlers
   const handleAddValidators = async () => {
     if (!selectedPositionForValidator || selectedValidatorUnits.length === 0) {
       toast.error('Selecciona una posición y al menos una unidad validadora');
@@ -384,48 +343,28 @@ export default function CampaignDetailPage() {
     setAddingValidators(true);
     try {
       let successCount = 0;
-      let errorCount = 0;
-
       for (const unitId of selectedValidatorUnits) {
-        try {
-          const { error } = await supabase
-            .from('campaign_validators')
-            .insert({
-              campaign_id: id,
-              campaign_position_id: selectedPositionForValidator,
-              validator_unit_id: unitId,
-              is_required: true,
-            });
-
-          if (error) {
-            if (error.code === '23505') {
-              // Already exists
-            } else {
-              console.error('Insert validator error:', error);
-              errorCount++;
-            }
-          } else {
-            successCount++;
-          }
-        } catch (e) {
-          errorCount++;
-        }
+        const { error } = await supabase
+          .from('campaign_validators')
+          .insert({
+            campaign_id: id,
+            campaign_position_id: selectedPositionForValidator,
+            validator_unit_id: unitId,
+            is_required: true,
+          });
+        if (!error) successCount++;
       }
 
       if (successCount > 0) {
         toast.success(`${successCount} validadores asignados`);
+        setValidatorDialogOpen(false);
+        setSelectedPositionForValidator('');
+        setSelectedValidatorUnits([]);
+        await refreshCampaignValidators();
       }
-      if (errorCount > 0) {
-        toast.error(`${errorCount} validadores no pudieron ser asignados`);
-      }
-
-      setValidatorDialogOpen(false);
-      setSelectedPositionForValidator('');
-      setSelectedValidatorUnits([]);
-      fetchCampaignValidators();
     } catch (err) {
       console.error('Error adding validators:', err);
-      toast.error('Error al asignar validadores: ' + (err.message || 'Error desconocido'));
+      toast.error('Error al asignar validadores');
     } finally {
       setAddingValidators(false);
     }
@@ -439,10 +378,10 @@ export default function CampaignDetailPage() {
         .eq('id', validatorId);
       if (error) throw error;
       toast.success('Validador eliminado');
-      fetchCampaignValidators();
+      await refreshCampaignValidators();
     } catch (err) {
       console.error('Error removing validator:', err);
-      toast.error('Error al eliminar validador: ' + (err.message || 'Error desconocido'));
+      toast.error('Error al eliminar');
     }
   };
 
@@ -463,18 +402,16 @@ export default function CampaignDetailPage() {
   return (
     <div className="space-y-6" data-testid="campaign-detail-page">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => navigate('/planeacion/campaigns')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver
           </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-heading text-2xl font-bold text-slate-900">{campaign?.name}</h1>
-              {getStatusBadge(campaign?.status)}
-              {!isEditable && <Lock className="w-4 h-4 text-slate-400" />}
-            </div>
+          <div className="flex items-center gap-2">
+            <h1 className="font-heading text-2xl font-bold text-slate-900">{campaign?.name}</h1>
+            {getStatusBadge(campaign?.status)}
+            {!isEditable && <Lock className="w-4 h-4 text-slate-400" />}
           </div>
         </div>
         
@@ -514,7 +451,6 @@ export default function CampaignDetailPage() {
                 id="campaignName"
                 value={campaign?.name || ''}
                 onChange={(e) => setCampaign({ ...campaign, name: e.target.value })}
-                disabled={!canEdit}
               />
             </div>
           </CardContent>
@@ -530,7 +466,7 @@ export default function CampaignDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="clues" className="flex items-center gap-2">
             <Building2 className="w-4 h-4" />
-            CLUES Autorizadas ({authorizedFacilities.length})
+            CLUES ({authorizedFacilities.length})
           </TabsTrigger>
           <TabsTrigger value="validators" className="flex items-center gap-2">
             <UserCheck className="w-4 h-4" />
@@ -543,23 +479,23 @@ export default function CampaignDetailPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-lg">Posiciones de la campaña</CardTitle>
-                <CardDescription>Selecciona las posiciones y define las plazas autorizadas</CardDescription>
+                <CardTitle className="text-lg">Posiciones</CardTitle>
+                <CardDescription>Define las posiciones y plazas autorizadas</CardDescription>
               </div>
               {canEdit && (
                 <Dialog open={positionDialogOpen} onOpenChange={setPositionDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button size="sm"><Plus className="w-4 h-4 mr-2" />Agregar posición</Button>
+                    <Button size="sm"><Plus className="w-4 h-4 mr-2" />Agregar</Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Agregar posición</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4">
+                    <div className="space-y-4 py-4">
                       <div className="space-y-2">
                         <Label>Posición</Label>
                         <Select value={selectedPosition} onValueChange={setSelectedPosition}>
-                          <SelectTrigger><SelectValue placeholder="Seleccionar posición" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                           <SelectContent>
                             {positions.filter(p => !campaignPositions.some(cp => cp.position_id === p.id)).map(p => (
                               <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
@@ -569,13 +505,7 @@ export default function CampaignDetailPage() {
                       </div>
                       <div className="space-y-2">
                         <Label>Plazas autorizadas</Label>
-                        <Input 
-                          type="number" 
-                          min="1" 
-                          value={slotsAuthorized} 
-                          onChange={(e) => setSlotsAuthorized(e.target.value)}
-                          placeholder="Ej: 10"
-                        />
+                        <Input type="number" min="1" value={slotsAuthorized} onChange={(e) => setSlotsAuthorized(e.target.value)} />
                       </div>
                     </div>
                     <DialogFooter>
@@ -597,14 +527,14 @@ export default function CampaignDetailPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Posición</TableHead>
-                      <TableHead>Plazas autorizadas</TableHead>
-                      {canEdit && <TableHead>Acciones</TableHead>}
+                      <TableHead>Plazas</TableHead>
+                      {canEdit && <TableHead className="w-16"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {campaignPositions.map((cp) => (
                       <TableRow key={cp.id}>
-                        <TableCell className="font-medium">{cp.positions_catalog?.name || 'N/A'}</TableCell>
+                        <TableCell>{cp.positions_catalog?.name || 'N/A'}</TableCell>
                         <TableCell>{cp.slots_authorized}</TableCell>
                         {canEdit && (
                           <TableCell>
@@ -627,47 +557,42 @@ export default function CampaignDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">CLUES Autorizadas</CardTitle>
-              <CardDescription>Unidades de salud habilitadas para esta campaña</CardDescription>
+              <CardDescription>Unidades de salud habilitadas</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {canEdit && (
-                <div className="space-y-4">
-                  <div className="flex gap-4">
-                    <div className="flex-1 space-y-2">
-                      <Label>Agregar CLUES (separadas por coma, punto y coma o salto de línea)</Label>
+                <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Ingresar CLUES (separadas por coma o línea)</Label>
                       <Textarea
                         value={cluesInput}
                         onChange={(e) => setCluesInput(e.target.value)}
-                        placeholder="BSSSA000001&#10;BSSSA000002&#10;BSSSA000003"
-                        rows={4}
+                        placeholder="BSSSA000001, BSSSA000002..."
+                        rows={3}
                       />
+                      <Button onClick={() => processClues(cluesInput)} disabled={validatingClues || !cluesInput.trim()}>
+                        {validatingClues && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Validar y agregar
+                      </Button>
                     </div>
-                    <div className="flex flex-col justify-end gap-2">
-                      <div className="space-y-2">
-                        <Label>O cargar archivo</Label>
-                        <div className="relative">
-                          <input
-                            type="file"
-                            accept=".txt,.csv"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                            id="clues-file-upload"
-                          />
-                          <label 
-                            htmlFor="clues-file-upload" 
-                            className="inline-flex items-center px-4 py-2 border border-slate-300 rounded-md cursor-pointer hover:bg-slate-50"
-                          >
-                            <Upload className="w-4 h-4 mr-2" />
-                            Subir .txt/.csv
-                          </label>
-                        </div>
+                    <div className="space-y-2">
+                      <Label>O cargar archivo (.txt, .csv)</Label>
+                      <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                        <input
+                          type="file"
+                          accept=".txt,.csv"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="clues-file"
+                        />
+                        <label htmlFor="clues-file" className="cursor-pointer">
+                          <Upload className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+                          <p className="text-sm text-slate-500">Clic para seleccionar archivo</p>
+                        </label>
                       </div>
                     </div>
                   </div>
-                  <Button onClick={() => handleValidateClues()} disabled={validatingClues}>
-                    {validatingClues ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    Validar y agregar
-                  </Button>
                 </div>
               )}
 
@@ -679,7 +604,7 @@ export default function CampaignDetailPage() {
                     <TableRow>
                       <TableHead>CLUES</TableHead>
                       <TableHead>Nombre</TableHead>
-                      {canEdit && <TableHead>Acciones</TableHead>}
+                      {canEdit && <TableHead className="w-16"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -708,23 +633,23 @@ export default function CampaignDetailPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-lg">Unidades validadoras</CardTitle>
-                <CardDescription>Asigna las unidades que validarán cada posición</CardDescription>
+                <CardTitle className="text-lg">Validadores</CardTitle>
+                <CardDescription>Unidades que validarán cada posición</CardDescription>
               </div>
               {canEdit && campaignPositions.length > 0 && (
                 <Dialog open={validatorDialogOpen} onOpenChange={setValidatorDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button size="sm"><Plus className="w-4 h-4 mr-2" />Asignar validadores</Button>
+                    <Button size="sm"><Plus className="w-4 h-4 mr-2" />Asignar</Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Asignar validadores</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4">
+                    <div className="space-y-4 py-4">
                       <div className="space-y-2">
                         <Label>Posición</Label>
                         <Select value={selectedPositionForValidator} onValueChange={setSelectedPositionForValidator}>
-                          <SelectTrigger><SelectValue placeholder="Seleccionar posición" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                           <SelectContent>
                             {campaignPositions.map(cp => (
                               <SelectItem key={cp.id} value={cp.id}>{cp.positions_catalog?.name}</SelectItem>
@@ -735,20 +660,18 @@ export default function CampaignDetailPage() {
                       <div className="space-y-2">
                         <Label>Unidades validadoras</Label>
                         {validatorUnits.length === 0 ? (
-                          <p className="text-sm text-slate-500 p-3 border rounded-md">No hay unidades validadoras disponibles</p>
+                          <p className="text-sm text-slate-500 p-3 border rounded">No hay unidades disponibles</p>
                         ) : (
-                          <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                          <div className="border rounded p-3 max-h-48 overflow-y-auto space-y-2">
                             {validatorUnits.map(unit => (
                               <div key={unit.id} className="flex items-center space-x-2">
                                 <Checkbox
                                   id={`unit-${unit.id}`}
                                   checked={selectedValidatorUnits.includes(unit.id)}
                                   onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setSelectedValidatorUnits([...selectedValidatorUnits, unit.id]);
-                                    } else {
-                                      setSelectedValidatorUnits(selectedValidatorUnits.filter(id => id !== unit.id));
-                                    }
+                                    setSelectedValidatorUnits(prev => 
+                                      checked ? [...prev, unit.id] : prev.filter(id => id !== unit.id)
+                                    );
                                   }}
                                 />
                                 <label htmlFor={`unit-${unit.id}`} className="text-sm cursor-pointer">{unit.name}</label>
@@ -780,8 +703,7 @@ export default function CampaignDetailPage() {
                     <TableRow>
                       <TableHead>Posición</TableHead>
                       <TableHead>Unidad validadora</TableHead>
-                      <TableHead>Requerido</TableHead>
-                      {canEdit && <TableHead>Acciones</TableHead>}
+                      {canEdit && <TableHead className="w-16"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -789,11 +711,6 @@ export default function CampaignDetailPage() {
                       <TableRow key={cv.id}>
                         <TableCell>{cv.campaign_positions?.positions_catalog?.name || 'N/A'}</TableCell>
                         <TableCell>{cv.validator_units?.name || 'N/A'}</TableCell>
-                        <TableCell>
-                          <Badge variant={cv.is_required ? 'default' : 'secondary'}>
-                            {cv.is_required ? 'Sí' : 'No'}
-                          </Badge>
-                        </TableCell>
                         {canEdit && (
                           <TableCell>
                             <Button variant="ghost" size="sm" onClick={() => handleRemoveValidator(cv.id)}>
