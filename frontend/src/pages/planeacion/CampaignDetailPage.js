@@ -384,9 +384,10 @@ export default function CampaignDetailPage() {
         for (const facility of validFacilities) {
           try {
             console.log('=== DEBUG: Inserting facility:', facility);
+            const campaignId = Number(id);
             const { error: insertError } = await supabase
               .from('campaign_authorized_facilities')
-              .insert({ campaign_id: id, facility_id: facility.id });
+              .insert({ campaign_id: Number.isNaN(campaignId) ? id : campaignId, clues: facility.clues });
             
             if (insertError) {
               console.error('=== DEBUG: Insert error:', insertError);
