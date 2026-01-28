@@ -322,22 +322,35 @@ export default function CampaignDetailPage() {
     }
 
     setValidatingClues(true);
+    
+    // Update debug info
+    const queryDesc = `supabase.from('health_facilities').select('*').eq('clues', '${cluesList[0]}').maybeSingle()`;
+    setDebugInfo(prev => ({ ...prev, lastQuery: queryDesc, lastQueryResult: 'Processing...', lastError: null }));
+    
+    console.log('=== DEBUG: processClues started ===');
+    console.log('CLUES to process:', cluesList);
+    
     try {
-      // Query one by one to avoid body stream error
       const validFacilities = [];
       const invalidClues = [];
+      let lastError = null;
 
-      for (const clues of cluesList) {
+      for (const cluesCode of cluesList) {
         try {
+          console.log(`=== DEBUG: Querying CLUES: ${cluesCode} ===`);
+          
           const { data, error } = await supabase
             .from('health_facilities')
-            .select('id, clues, name')
-            .eq('clues', clues)
+            .select('*')
+            .eq('clues', cluesCode)
             .maybeSingle();
 
+          console.log(`=== DEBUG: Result for ${cluesCode}:`, { data, error });
+
           if (error) {
-            console.error('Query error for', clues, error);
-            invalidClues.push(clues);
+            console.error('=== DEBUG: Query error for', cluesCode, error);
+            lastError = error;
+            invalidClues.push(cluesCode);
           } else if (data) {
             validFacilities.push(data);
           } else {
