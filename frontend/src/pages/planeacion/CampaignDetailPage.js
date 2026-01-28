@@ -684,6 +684,81 @@ export default function CampaignDetailPage() {
 
         {/* CLUES Tab */}
         <TabsContent value="clues">
+          {/* Debug Panel */}
+          <Card className="mb-4 border-amber-300 bg-amber-50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
+                <Bug className="w-4 h-4" />
+                Debug Panel - Supabase Connection
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 font-mono text-xs">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p><strong>Session Status:</strong> {debugInfo.sessionStatus}</p>
+                  <p><strong>User ID:</strong> {user?.id || 'N/A'}</p>
+                  <p><strong>Email:</strong> {user?.email || 'N/A'}</p>
+                </div>
+                <div className="space-y-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={testHealthFacilitiesQuery}
+                    className="text-xs"
+                  >
+                    Test health_facilities Query
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={checkSessionStatus}
+                    className="text-xs ml-2"
+                  >
+                    Refresh Session
+                  </Button>
+                </div>
+              </div>
+              
+              {debugInfo.lastQuery && (
+                <div className="mt-3 p-2 bg-white rounded border">
+                  <p className="text-amber-700"><strong>Last Query:</strong></p>
+                  <code className="text-xs break-all">{debugInfo.lastQuery}</code>
+                  <p className="mt-2"><strong>Result:</strong> {debugInfo.lastQueryResult}</p>
+                  {debugInfo.sampleData && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-blue-600">Sample Data</summary>
+                      <pre className="text-xs mt-1 overflow-auto max-h-32 bg-slate-100 p-2 rounded">
+                        {JSON.stringify(debugInfo.sampleData, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              )}
+              
+              {debugInfo.lastError && (
+                <div className="mt-2 p-2 bg-red-100 rounded border border-red-300">
+                  <p className="text-red-700"><strong>Error:</strong></p>
+                  <pre className="text-xs text-red-600 overflow-auto max-h-32">{debugInfo.lastError}</pre>
+                </div>
+              )}
+              
+              {debugInfo.validFacilitiesFound && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-green-600">Valid Facilities Found ({debugInfo.validFacilitiesFound.length})</summary>
+                  <pre className="text-xs mt-1 overflow-auto max-h-32 bg-green-50 p-2 rounded">
+                    {JSON.stringify(debugInfo.validFacilitiesFound, null, 2)}
+                  </pre>
+                </details>
+              )}
+              
+              {debugInfo.invalidCluesList && debugInfo.invalidCluesList.length > 0 && (
+                <div className="mt-2 p-2 bg-yellow-100 rounded">
+                  <p className="text-yellow-700"><strong>Invalid CLUES:</strong> {debugInfo.invalidCluesList.join(', ')}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">CLUES Autorizadas</CardTitle>
