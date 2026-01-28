@@ -11,7 +11,6 @@ export const AuthProvider = ({ children }) => {
   const [rolesDebug, setRolesDebug] = useState(null);
   const [loading, setLoading] = useState(true);
   const signInInProgress = useRef(false);
-  const initializationDone = useRef(false);
 
   const fetchUserRoles = useCallback(async (userId) => {
     console.log('=== DEBUG: Fetching roles for user_id:', userId);
@@ -19,19 +18,13 @@ export const AuthProvider = ({ children }) => {
     const debugInfo = { userId, steps: [], timestamp: new Date().toISOString() };
     
     try {
-      // Step 1: Get user_roles records with timeout
+      // Step 1: Get user_roles records
       debugInfo.steps.push('Fetching user_roles...');
       
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
-      );
-      
-      const queryPromise = supabase
+      const { data: userRolesData, error: userRolesError } = await supabase
         .from('user_roles')
         .select('*')
         .eq('user_id', userId);
-
-      const { data: userRolesData, error: userRolesError } = await Promise.race([queryPromise, timeoutPromise]);
 
       debugInfo.userRolesResult = { data: userRolesData, error: userRolesError?.message || null };
       console.log('=== DEBUG: user_roles result:', JSON.stringify(debugInfo.userRolesResult, null, 2));
@@ -95,22 +88,19 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // Prevent double initialization in React Strict Mode
-    if (initializationDone.current) return;
-    initializationDone.current = true;
-
     let mounted = true;
+    let timeoutId = null;
 
     const init = async () => {
       console.log('=== DEBUG: Starting auth initialization...');
       
-      try {
-        // Set a maximum timeout for the entire initialization
-        const timeout = setTimeout(() => {
-          console.log('=== DEBUG: Init timeout reached, forcing loading=false');
-          if (mounted) setLoading(false);
-        }, 15000);
+      // Force loading to false after 10 seconds no matter what
+      timeoutId = setTimeout(() => {
+        console.log('=== DEBUG: Force timeout - setting loading=false');
+        if (mounted) setLoading(false);
+      }, 10000);
 
+      try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         console.log('=== DEBUG: getSession result:', { 
@@ -119,23 +109,14 @@ export const AuthProvider = ({ children }) => {
           error: sessionError?.message 
         });
         
-        if (!mounted) {
-          clearTimeout(timeout);
-          return;
-        }
+        if (!mounted) return;
 
         if (sessionError) {
           console.error('=== DEBUG: Session error:', sessionError);
-          setLoading(false);
-          clearTimeout(timeout);
-          return;
-        }
-
-        if (session?.user) {
+        } else if (session?.user) {
           console.log('=== DEBUG: User found, id:', session.user.id);
           setUser(session.user);
           
-          // Fetch roles but don't block loading on it
           try {
             const roles = await fetchUserRoles(session.user.id);
             if (mounted) setUserRoles(roles);
@@ -143,15 +124,14 @@ export const AuthProvider = ({ children }) => {
             console.error('=== DEBUG: Roles fetch error:', rolesErr);
           }
         }
-
-        clearTimeout(timeout);
-        if (mounted) {
-          console.log('=== DEBUG: Setting loading=false');
-          setLoading(false);
-        }
       } catch (err) {
         console.error('=== DEBUG: Init error:', err);
-        if (mounted) setLoading(false);
+      } finally {
+        console.log('=== DEBUG: Init finally - setting loading=false');
+        if (mounted) {
+          clearTimeout(timeoutId);
+          setLoading(false);
+        }
       }
     };
 
@@ -169,7 +149,6 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setUserRoles([]);
         setRolesDebug(null);
-        setLoading(false);
       } else if (session?.user) {
         setUser(session.user);
         try {
@@ -178,14 +157,14 @@ export const AuthProvider = ({ children }) => {
         } catch (err) {
           console.error('Roles fetch error on auth change:', err);
         }
-        if (mounted) setLoading(false);
-      } else {
-        if (mounted) setLoading(false);
       }
+      
+      setLoading(false);
     });
 
     return () => {
       mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, [fetchUserRoles]);
