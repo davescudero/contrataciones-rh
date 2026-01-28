@@ -1,58 +1,69 @@
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { 
-  Users, 
+  ClipboardList, 
+  Eye,
+  UserCheck,
   FileText, 
-  Building2, 
-  ClipboardCheck, 
+  CheckCircle,
   LayoutDashboard,
-  Megaphone
+  Megaphone,
+  AlertCircle,
+  BarChart3
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-const ROLE_LABELS = {
-  admin: 'Administrador',
-  hr_manager: 'Gestor de RH',
-  validator: 'Validador',
-  viewer: 'Visualizador',
-  state_coordinator: 'Coordinador Estatal',
-};
+import { ROLES, ROLE_LABELS } from '../lib/constants';
 
 const MENU_ITEMS = [
   {
-    title: 'Campañas',
-    description: 'Gestión de campañas de reclutamiento',
+    title: 'Gestión de Campañas',
+    description: 'Crear y configurar campañas de reclutamiento',
+    icon: ClipboardList,
+    href: '/planeacion/campaigns',
+    roles: [ROLES.PLANEACION],
+  },
+  {
+    title: 'Revisión de Programas',
+    description: 'Revisar y aprobar campañas en revisión',
+    icon: Eye,
+    href: '/atencion-salud/review',
+    roles: [ROLES.ATENCION_SALUD],
+  },
+  {
+    title: 'Activación de Campañas',
+    description: 'Activar y desactivar campañas aprobadas',
     icon: Megaphone,
-    href: '/campaigns',
-    roles: ['admin', 'hr_manager', 'state_coordinator', 'viewer'],
+    href: '/rh/campaigns',
+    roles: [ROLES.RH],
+  },
+  {
+    title: 'Dashboard RH',
+    description: 'Indicadores y reportes de reclutamiento',
+    icon: BarChart3,
+    href: '/rh/dashboard',
+    roles: [ROLES.RH],
   },
   {
     title: 'Propuestas',
-    description: 'Visualizar y gestionar propuestas',
+    description: 'Crear y dar seguimiento a propuestas',
     icon: FileText,
-    href: '/proposals',
-    roles: ['admin', 'hr_manager', 'validator', 'state_coordinator', 'viewer'],
+    href: '/coordinacion/proposals',
+    roles: [ROLES.COORD_ESTATAL],
   },
   {
     title: 'Validaciones',
-    description: 'Revisar y validar propuestas',
-    icon: ClipboardCheck,
-    href: '/validations',
-    roles: ['admin', 'validator'],
+    description: 'Validar propuestas asignadas',
+    icon: CheckCircle,
+    href: '/validador/validations',
+    roles: [ROLES.VALIDADOR],
   },
   {
-    title: 'Unidades de Salud',
-    description: 'Catálogo de unidades médicas',
-    icon: Building2,
-    href: '/health-facilities',
-    roles: ['admin', 'hr_manager', 'state_coordinator'],
-  },
-  {
-    title: 'Usuarios',
-    description: 'Administración de usuarios del sistema',
-    icon: Users,
-    href: '/users',
-    roles: ['admin'],
+    title: 'Dashboard Ejecutivo',
+    description: 'Vista ejecutiva del proceso de reclutamiento',
+    icon: BarChart3,
+    href: '/dg/dashboard',
+    roles: [ROLES.DG],
   },
 ];
 
@@ -71,7 +82,7 @@ export default function HomePage() {
           </div>
           <div>
             <h1 className="font-heading text-2xl font-bold text-slate-900" data-testid="welcome-title">
-              Bienvenido al Sistema
+              Sistema de Reclutamiento
             </h1>
             <p className="font-body text-slate-500">
               {user?.email}
@@ -94,6 +105,17 @@ export default function HomePage() {
         </p>
       </div>
 
+      {/* No Roles Warning */}
+      {userRoles.length === 0 && (
+        <Alert variant="destructive" className="bg-amber-50 border-amber-200" data-testid="no-roles-alert">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800">Sin acceso al sistema</AlertTitle>
+          <AlertDescription className="text-amber-700">
+            Tu usuario no tiene roles asignados. Contacta a administración para solicitar acceso.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Menu Grid */}
       {visibleMenuItems.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="menu-grid">
@@ -101,7 +123,7 @@ export default function HomePage() {
             <Link key={item.href} to={item.href} className="block">
               <Card 
                 className="h-full bg-white border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200 cursor-pointer"
-                data-testid={`menu-item-${item.href.replace('/', '')}`}
+                data-testid={`menu-item-${item.href.replace(/\//g, '-').slice(1)}`}
               >
                 <CardHeader className="pb-2">
                   <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center mb-2">
@@ -120,11 +142,11 @@ export default function HomePage() {
             </Link>
           ))}
         </div>
-      ) : (
-        <Card className="bg-amber-50 border-amber-200" data-testid="no-access-card">
+      ) : userRoles.length > 0 && (
+        <Card className="bg-slate-50 border-slate-200" data-testid="no-access-card">
           <CardContent className="p-6 text-center">
-            <p className="font-body text-amber-800">
-              No tienes acceso a ningún módulo. Contacta al administrador.
+            <p className="font-body text-slate-600">
+              No hay módulos disponibles para tus roles actuales.
             </p>
           </CardContent>
         </Card>
