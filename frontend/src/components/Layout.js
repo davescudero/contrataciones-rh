@@ -132,6 +132,18 @@ export const Layout = ({ children }) => {
 
             {/* User Menu */}
             <div className="flex items-center gap-2">
+              {/* Direct Logout Button for debugging */}
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleSignOut}
+                className="text-red-600 border-red-200 hover:bg-red-50"
+                data-testid="direct-logout-btn"
+              >
+                <LogOut className="w-4 h-4 mr-1" />
+                Salir
+              </Button>
+
               {/* Mobile Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild className="lg:hidden">
