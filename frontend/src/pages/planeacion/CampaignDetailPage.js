@@ -24,7 +24,7 @@ import { Alert, AlertDescription } from '../../components/ui/alert';
 import { toast } from 'sonner';
 import { 
   ArrowLeft, Save, Send, Plus, Trash2, Loader2, AlertCircle, 
-  Briefcase, Building2, UserCheck, Lock
+  Briefcase, Building2, UserCheck, Lock, Upload, FileText
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABELS, ROLES } from '../../lib/constants';
 
@@ -44,6 +44,7 @@ export default function CampaignDetailPage() {
   const [positionDialogOpen, setPositionDialogOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState('');
   const [slotsAuthorized, setSlotsAuthorized] = useState('');
+  const [addingPosition, setAddingPosition] = useState(false);
   
   // CLUES
   const [cluesInput, setCluesInput] = useState('');
@@ -56,6 +57,7 @@ export default function CampaignDetailPage() {
   const [validatorDialogOpen, setValidatorDialogOpen] = useState(false);
   const [selectedPositionForValidator, setSelectedPositionForValidator] = useState('');
   const [selectedValidatorUnits, setSelectedValidatorUnits] = useState([]);
+  const [addingValidators, setAddingValidators] = useState(false);
 
   const isEditable = campaign?.status === CAMPAIGN_STATUS.DRAFT;
   const canEdit = hasRole(ROLES.PLANEACION) && isEditable;
@@ -173,7 +175,7 @@ export default function CampaignDetailPage() {
       toast.success('Campaña actualizada');
     } catch (err) {
       console.error('Error saving campaign:', err);
-      toast.error('Error al guardar');
+      toast.error('Error al guardar: ' + (err.message || 'Error desconocido'));
     } finally {
       setSaving(false);
     }
@@ -200,7 +202,7 @@ export default function CampaignDetailPage() {
       fetchCampaign();
     } catch (err) {
       console.error('Error submitting campaign:', err);
-      toast.error('Error al enviar a revisión');
+      toast.error('Error al enviar a revisión: ' + (err.message || 'Error desconocido'));
     } finally {
       setSubmitting(false);
     }
@@ -212,6 +214,7 @@ export default function CampaignDetailPage() {
       toast.error('Selecciona una posición y define las plazas autorizadas');
       return;
     }
+    setAddingPosition(true);
     try {
       const { error } = await supabase
         .from('campaign_positions')
@@ -228,7 +231,9 @@ export default function CampaignDetailPage() {
       fetchCampaignPositions();
     } catch (err) {
       console.error('Error adding position:', err);
-      toast.error('Error al agregar posición');
+      toast.error('Error al agregar posición: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setAddingPosition(false);
     }
   };
 
@@ -244,13 +249,15 @@ export default function CampaignDetailPage() {
       fetchCampaignValidators();
     } catch (err) {
       console.error('Error removing position:', err);
-      toast.error('Error al eliminar posición');
+      toast.error('Error al eliminar posición: ' + (err.message || 'Error desconocido'));
     }
   };
 
   // CLUES handlers
-  const handleValidateClues = async () => {
-    const cluesList = cluesInput.split(/[\n,;]+/).map(c => c.trim()).filter(Boolean);
+  const handleValidateClues = async (cluesText) => {
+    const textToProcess = cluesText || cluesInput;
+    const cluesList = textToProcess.split(/[\n,;]+/).map(c => c.trim().toUpperCase()).filter(Boolean);
+    
     if (cluesList.length === 0) {
       toast.error('Ingresa al menos una CLUES');
       return;
@@ -264,38 +271,93 @@ export default function CampaignDetailPage() {
         .select('id, clues, name')
         .in('clues', cluesList);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error querying health_facilities:', error);
+        toast.error('Error al buscar CLUES: ' + error.message);
+        return;
+      }
 
       const validClues = validFacilities?.map(f => f.clues) || [];
       const invalidClues = cluesList.filter(c => !validClues.includes(c));
 
       if (invalidClues.length > 0) {
-        toast.error(`CLUES no encontradas: ${invalidClues.slice(0, 5).join(', ')}${invalidClues.length > 5 ? '...' : ''}`);
+        toast.error(`CLUES no encontradas (${invalidClues.length}): ${invalidClues.slice(0, 5).join(', ')}${invalidClues.length > 5 ? '...' : ''}`);
       }
 
       if (validFacilities && validFacilities.length > 0) {
-        // Insert valid facilities
-        const toInsert = validFacilities.map(f => ({
-          campaign_id: id,
-          facility_id: f.id,
-        }));
+        // Insert valid facilities one by one to avoid constraint issues
+        let successCount = 0;
+        let errorCount = 0;
 
-        const { error: insertError } = await supabase
-          .from('campaign_authorized_facilities')
-          .upsert(toInsert, { onConflict: 'campaign_id,facility_id' });
+        for (const facility of validFacilities) {
+          try {
+            const { error: insertError } = await supabase
+              .from('campaign_authorized_facilities')
+              .insert({
+                campaign_id: id,
+                facility_id: facility.id,
+              });
 
-        if (insertError) throw insertError;
+            if (insertError) {
+              // Check if it's a duplicate error
+              if (insertError.code === '23505') {
+                // Already exists, skip
+              } else {
+                console.error('Insert error:', insertError);
+                errorCount++;
+              }
+            } else {
+              successCount++;
+            }
+          } catch (e) {
+            errorCount++;
+          }
+        }
         
-        toast.success(`${validFacilities.length} CLUES agregadas`);
+        if (successCount > 0) {
+          toast.success(`${successCount} CLUES agregadas exitosamente`);
+        }
+        if (errorCount > 0) {
+          toast.error(`${errorCount} CLUES no pudieron ser agregadas`);
+        }
+        
         setCluesInput('');
         fetchAuthorizedFacilities();
+      } else if (invalidClues.length === 0) {
+        toast.info('No se encontraron CLUES para agregar');
       }
     } catch (err) {
       console.error('Error validating CLUES:', err);
-      toast.error('Error al validar CLUES');
+      toast.error('Error al validar CLUES: ' + (err.message || 'Error desconocido'));
     } finally {
       setValidatingClues(false);
     }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.txt') && !file.name.endsWith('.csv')) {
+      toast.error('Solo se permiten archivos .txt o .csv');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target?.result;
+      if (typeof content === 'string') {
+        // Process the file content
+        await handleValidateClues(content);
+      }
+    };
+    reader.onerror = () => {
+      toast.error('Error al leer el archivo');
+    };
+    reader.readAsText(file);
+    
+    // Reset the input
+    e.target.value = '';
   };
 
   const handleRemoveFacility = async (facilityId) => {
@@ -309,7 +371,7 @@ export default function CampaignDetailPage() {
       fetchAuthorizedFacilities();
     } catch (err) {
       console.error('Error removing facility:', err);
-      toast.error('Error al eliminar CLUES');
+      toast.error('Error al eliminar CLUES: ' + (err.message || 'Error desconocido'));
     }
   };
 
@@ -319,27 +381,53 @@ export default function CampaignDetailPage() {
       toast.error('Selecciona una posición y al menos una unidad validadora');
       return;
     }
+    setAddingValidators(true);
     try {
-      const toInsert = selectedValidatorUnits.map(unitId => ({
-        campaign_id: id,
-        campaign_position_id: selectedPositionForValidator,
-        validator_unit_id: unitId,
-        is_required: true,
-      }));
+      let successCount = 0;
+      let errorCount = 0;
 
-      const { error } = await supabase
-        .from('campaign_validators')
-        .upsert(toInsert, { onConflict: 'campaign_id,campaign_position_id,validator_unit_id' });
+      for (const unitId of selectedValidatorUnits) {
+        try {
+          const { error } = await supabase
+            .from('campaign_validators')
+            .insert({
+              campaign_id: id,
+              campaign_position_id: selectedPositionForValidator,
+              validator_unit_id: unitId,
+              is_required: true,
+            });
 
-      if (error) throw error;
-      toast.success('Validadores asignados');
+          if (error) {
+            if (error.code === '23505') {
+              // Already exists
+            } else {
+              console.error('Insert validator error:', error);
+              errorCount++;
+            }
+          } else {
+            successCount++;
+          }
+        } catch (e) {
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`${successCount} validadores asignados`);
+      }
+      if (errorCount > 0) {
+        toast.error(`${errorCount} validadores no pudieron ser asignados`);
+      }
+
       setValidatorDialogOpen(false);
       setSelectedPositionForValidator('');
       setSelectedValidatorUnits([]);
       fetchCampaignValidators();
     } catch (err) {
       console.error('Error adding validators:', err);
-      toast.error('Error al asignar validadores');
+      toast.error('Error al asignar validadores: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setAddingValidators(false);
     }
   };
 
@@ -354,7 +442,7 @@ export default function CampaignDetailPage() {
       fetchCampaignValidators();
     } catch (err) {
       console.error('Error removing validator:', err);
-      toast.error('Error al eliminar validador');
+      toast.error('Error al eliminar validador: ' + (err.message || 'Error desconocido'));
     }
   };
 
@@ -492,7 +580,10 @@ export default function CampaignDetailPage() {
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setPositionDialogOpen(false)}>Cancelar</Button>
-                      <Button onClick={handleAddPosition}>Agregar</Button>
+                      <Button onClick={handleAddPosition} disabled={addingPosition}>
+                        {addingPosition && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Agregar
+                      </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -540,15 +631,40 @@ export default function CampaignDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {canEdit && (
-                <div className="space-y-2">
-                  <Label>Agregar CLUES (separadas por coma, punto y coma o salto de línea)</Label>
-                  <Textarea
-                    value={cluesInput}
-                    onChange={(e) => setCluesInput(e.target.value)}
-                    placeholder="BSSSA000001&#10;BSSSA000002&#10;BSSSA000003"
-                    rows={4}
-                  />
-                  <Button onClick={handleValidateClues} disabled={validatingClues}>
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <div className="flex-1 space-y-2">
+                      <Label>Agregar CLUES (separadas por coma, punto y coma o salto de línea)</Label>
+                      <Textarea
+                        value={cluesInput}
+                        onChange={(e) => setCluesInput(e.target.value)}
+                        placeholder="BSSSA000001&#10;BSSSA000002&#10;BSSSA000003"
+                        rows={4}
+                      />
+                    </div>
+                    <div className="flex flex-col justify-end gap-2">
+                      <div className="space-y-2">
+                        <Label>O cargar archivo</Label>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept=".txt,.csv"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                            id="clues-file-upload"
+                          />
+                          <label 
+                            htmlFor="clues-file-upload" 
+                            className="inline-flex items-center px-4 py-2 border border-slate-300 rounded-md cursor-pointer hover:bg-slate-50"
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            Subir .txt/.csv
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <Button onClick={() => handleValidateClues()} disabled={validatingClues}>
                     {validatingClues ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                     Validar y agregar
                   </Button>
@@ -618,29 +734,36 @@ export default function CampaignDetailPage() {
                       </div>
                       <div className="space-y-2">
                         <Label>Unidades validadoras</Label>
-                        <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
-                          {validatorUnits.map(unit => (
-                            <div key={unit.id} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`unit-${unit.id}`}
-                                checked={selectedValidatorUnits.includes(unit.id)}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedValidatorUnits([...selectedValidatorUnits, unit.id]);
-                                  } else {
-                                    setSelectedValidatorUnits(selectedValidatorUnits.filter(id => id !== unit.id));
-                                  }
-                                }}
-                              />
-                              <label htmlFor={`unit-${unit.id}`} className="text-sm">{unit.name}</label>
-                            </div>
-                          ))}
-                        </div>
+                        {validatorUnits.length === 0 ? (
+                          <p className="text-sm text-slate-500 p-3 border rounded-md">No hay unidades validadoras disponibles</p>
+                        ) : (
+                          <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                            {validatorUnits.map(unit => (
+                              <div key={unit.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`unit-${unit.id}`}
+                                  checked={selectedValidatorUnits.includes(unit.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedValidatorUnits([...selectedValidatorUnits, unit.id]);
+                                    } else {
+                                      setSelectedValidatorUnits(selectedValidatorUnits.filter(id => id !== unit.id));
+                                    }
+                                  }}
+                                />
+                                <label htmlFor={`unit-${unit.id}`} className="text-sm cursor-pointer">{unit.name}</label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setValidatorDialogOpen(false)}>Cancelar</Button>
-                      <Button onClick={handleAddValidators}>Asignar</Button>
+                      <Button onClick={handleAddValidators} disabled={addingValidators}>
+                        {addingValidators && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Asignar
+                      </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
