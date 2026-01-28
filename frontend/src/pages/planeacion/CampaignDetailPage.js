@@ -24,7 +24,7 @@ import { Alert, AlertDescription } from '../../components/ui/alert';
 import { toast } from 'sonner';
 import { 
   ArrowLeft, Save, Send, Plus, Trash2, Loader2, 
-  Briefcase, Building2, UserCheck, Lock, Upload, Bug
+  Briefcase, Building2, UserCheck, Lock, Upload
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABELS, ROLES } from '../../lib/constants';
 
@@ -37,14 +37,6 @@ export default function CampaignDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  
-  // Debug state
-  const [debugInfo, setDebugInfo] = useState({
-    sessionStatus: 'checking...',
-    lastQuery: null,
-    lastQueryResult: null,
-    lastError: null,
-  });
   
   // Positions
   const [positions, setPositions] = useState([]);
@@ -70,61 +62,9 @@ export default function CampaignDetailPage() {
   const isEditable = campaign?.status === CAMPAIGN_STATUS.DRAFT;
   const canEdit = hasRole(ROLES.PLANEACION) && isEditable;
 
-  // Check session status for debug
-  const checkSessionStatus = async () => {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error('Session check error:', error);
-      setDebugInfo(prev => ({ ...prev, sessionStatus: 'Error: ' + error.message }));
-    } else if (session) {
-      setDebugInfo(prev => ({ 
-        ...prev, 
-        sessionStatus: 'Logged in',
-        sessionUser: session.user?.id,
-        sessionEmail: session.user?.email,
-      }));
-    } else {
-      setDebugInfo(prev => ({ ...prev, sessionStatus: 'Not logged in (no session)' }));
-    }
-  };
-
-  // Debug test query for health_facilities
-  const testHealthFacilitiesQuery = async () => {
-    const queryDescription = "supabase.from('health_facilities').select('*').limit(5)";
-    setDebugInfo(prev => ({ ...prev, lastQuery: queryDescription, lastQueryResult: 'Loading...', lastError: null }));
-    
-    console.log('=== DEBUG: Testing health_facilities query ===');
-    console.log('Query:', queryDescription);
-    
-    const { data, error } = await supabase
-      .from('health_facilities')
-      .select('*')
-      .limit(5);
-    
-    if (error) {
-      console.error('=== DEBUG: health_facilities query ERROR ===', error);
-      setDebugInfo(prev => ({ 
-        ...prev, 
-        lastQueryResult: `ERROR - ${error.message}`,
-        lastError: JSON.stringify(error, null, 2)
-      }));
-    } else {
-      console.log('=== DEBUG: health_facilities query SUCCESS ===', data);
-      setDebugInfo(prev => ({ 
-        ...prev, 
-        lastQueryResult: `SUCCESS - ${data?.length || 0} rows returned`,
-        lastError: null,
-        sampleData: data?.slice(0, 2)
-      }));
-    }
-  };
-
   // Load all data on mount
   useEffect(() => {
     let isMounted = true;
-    
-    // Check session on mount
-    checkSessionStatus();
 
     const loadAllData = async () => {
       setLoading(true);
@@ -323,33 +263,20 @@ export default function CampaignDetailPage() {
 
     setValidatingClues(true);
     
-    // Update debug info
-    const queryDesc = `supabase.from('health_facilities').select('*').eq('clues', '${cluesList[0]}').maybeSingle()`;
-    setDebugInfo(prev => ({ ...prev, lastQuery: queryDesc, lastQueryResult: 'Processing...', lastError: null }));
-    
-    console.log('=== DEBUG: processClues started ===');
-    console.log('CLUES to process:', cluesList);
-    
     try {
       const validFacilities = [];
       const invalidClues = [];
-      let lastError = null;
 
       for (const cluesCode of cluesList) {
         try {
-          console.log(`=== DEBUG: Querying CLUES: ${cluesCode} ===`);
-          
           const { data, error } = await supabase
             .from('health_facilities')
             .select('*')
             .eq('clues', cluesCode)
             .maybeSingle();
 
-          console.log(`=== DEBUG: Result for ${cluesCode}:`, { data, error });
-
           if (error) {
-            console.error('=== DEBUG: Query error for', cluesCode, error);
-            lastError = error;
+            console.error('Query error for CLUES:', cluesCode, error);
             invalidClues.push(cluesCode);
           } else if (data) {
             validFacilities.push(data);
@@ -357,23 +284,10 @@ export default function CampaignDetailPage() {
             invalidClues.push(cluesCode);
           }
         } catch (e) {
-          console.error('=== DEBUG: Exception querying', cluesCode, e);
+          console.error('Exception querying CLUES:', cluesCode, e);
           invalidClues.push(cluesCode);
         }
       }
-
-      // Update debug info with results
-      setDebugInfo(prev => ({ 
-        ...prev, 
-        lastQueryResult: `Found: ${validFacilities.length}, Not found: ${invalidClues.length}`,
-        lastError: lastError ? JSON.stringify(lastError, null, 2) : null,
-        validFacilitiesFound: validFacilities.map(f => ({ id: f.id, clues: f.clues, name: f.name })),
-        invalidCluesList: invalidClues,
-      }));
-
-      console.log('=== DEBUG: processClues results ===');
-      console.log('Valid facilities:', validFacilities);
-      console.log('Invalid CLUES:', invalidClues);
 
       if (invalidClues.length > 0) {
         toast.error(`CLUES no encontradas (${invalidClues.length}): ${invalidClues.slice(0, 3).join(', ')}${invalidClues.length > 3 ? '...' : ''}`);
@@ -383,19 +297,18 @@ export default function CampaignDetailPage() {
         let successCount = 0;
         for (const facility of validFacilities) {
           try {
-            console.log('=== DEBUG: Inserting facility:', facility);
             const campaignId = Number(id);
             const { error: insertError } = await supabase
               .from('campaign_authorized_facilities')
               .insert({ campaign_id: Number.isNaN(campaignId) ? id : campaignId, clues: facility.clues });
             
             if (insertError) {
-              console.error('=== DEBUG: Insert error:', insertError);
+              console.error('Insert facility error:', insertError);
             } else {
               successCount++;
             }
           } catch (e) {
-            console.error('=== DEBUG: Insert exception:', e);
+            console.error('Insert facility exception:', e);
           }
         }
         
@@ -406,8 +319,7 @@ export default function CampaignDetailPage() {
         }
       }
     } catch (err) {
-      console.error('=== DEBUG: processClues error:', err);
-      setDebugInfo(prev => ({ ...prev, lastError: err.message || String(err) }));
+      console.error('Error processing CLUES:', err);
       toast.error('Error al procesar CLUES');
     } finally {
       setValidatingClues(false);
@@ -446,10 +358,6 @@ export default function CampaignDetailPage() {
 
   // Validator handlers
   const handleAddValidators = async () => {
-    console.log('=== handleAddValidators called ===');
-    console.log('selectedPositionForValidator:', selectedPositionForValidator);
-    console.log('selectedValidatorUnits:', selectedValidatorUnits);
-    
     if (!selectedPositionForValidator || selectedValidatorUnits.length === 0) {
       toast.error('Selecciona una posición y al menos una unidad validadora');
       return;
@@ -685,81 +593,6 @@ export default function CampaignDetailPage() {
 
         {/* CLUES Tab */}
         <TabsContent value="clues">
-          {/* Debug Panel */}
-          <Card className="mb-4 border-amber-300 bg-amber-50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
-                <Bug className="w-4 h-4" />
-                Debug Panel - Supabase Connection
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 font-mono text-xs">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <p><strong>Session Status:</strong> {debugInfo.sessionStatus}</p>
-                  <p><strong>User ID:</strong> {user?.id || 'N/A'}</p>
-                  <p><strong>Email:</strong> {user?.email || 'N/A'}</p>
-                </div>
-                <div className="space-y-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={testHealthFacilitiesQuery}
-                    className="text-xs"
-                  >
-                    Test health_facilities Query
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={checkSessionStatus}
-                    className="text-xs ml-2"
-                  >
-                    Refresh Session
-                  </Button>
-                </div>
-              </div>
-              
-              {debugInfo.lastQuery && (
-                <div className="mt-3 p-2 bg-white rounded border">
-                  <p className="text-amber-700"><strong>Last Query:</strong></p>
-                  <code className="text-xs break-all">{debugInfo.lastQuery}</code>
-                  <p className="mt-2"><strong>Result:</strong> {debugInfo.lastQueryResult}</p>
-                  {debugInfo.sampleData && (
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-blue-600">Sample Data</summary>
-                      <pre className="text-xs mt-1 overflow-auto max-h-32 bg-slate-100 p-2 rounded">
-                        {JSON.stringify(debugInfo.sampleData, null, 2)}
-                      </pre>
-                    </details>
-                  )}
-                </div>
-              )}
-              
-              {debugInfo.lastError && (
-                <div className="mt-2 p-2 bg-red-100 rounded border border-red-300">
-                  <p className="text-red-700"><strong>Error:</strong></p>
-                  <pre className="text-xs text-red-600 overflow-auto max-h-32">{debugInfo.lastError}</pre>
-                </div>
-              )}
-              
-              {debugInfo.validFacilitiesFound && (
-                <details className="mt-2">
-                  <summary className="cursor-pointer text-green-600">Valid Facilities Found ({debugInfo.validFacilitiesFound.length})</summary>
-                  <pre className="text-xs mt-1 overflow-auto max-h-32 bg-green-50 p-2 rounded">
-                    {JSON.stringify(debugInfo.validFacilitiesFound, null, 2)}
-                  </pre>
-                </details>
-              )}
-              
-              {debugInfo.invalidCluesList && debugInfo.invalidCluesList.length > 0 && (
-                <div className="mt-2 p-2 bg-yellow-100 rounded">
-                  <p className="text-yellow-700"><strong>Invalid CLUES:</strong> {debugInfo.invalidCluesList.join(', ')}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">CLUES Autorizadas</CardTitle>
@@ -845,7 +678,7 @@ export default function CampaignDetailPage() {
               {canEdit && campaignPositions.length > 0 && (
                 <Dialog open={validatorDialogOpen} onOpenChange={setValidatorDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button size="sm" onClick={() => console.log('Opening validator dialog')}>
+                    <Button size="sm">
                       <Plus className="w-4 h-4 mr-2" />Asignar
                     </Button>
                   </DialogTrigger>
@@ -858,10 +691,7 @@ export default function CampaignDetailPage() {
                         <Label>Posición</Label>
                         <Select 
                           value={selectedPositionForValidator} 
-                          onValueChange={(val) => {
-                            console.log('Position selected:', val);
-                            setSelectedPositionForValidator(val);
-                          }}
+                          onValueChange={setSelectedPositionForValidator}
                         >
                           <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                           <SelectContent>
@@ -884,7 +714,6 @@ export default function CampaignDetailPage() {
                                   checked={selectedValidatorUnits.includes(String(unit.id))}
                                   onCheckedChange={(checked) => {
                                     const unitIdStr = String(unit.id);
-                                    console.log('Checkbox changed:', unitIdStr, checked);
                                     setSelectedValidatorUnits(prev => 
                                       checked ? [...prev, unitIdStr] : prev.filter(id => id !== unitIdStr)
                                     );
@@ -900,10 +729,7 @@ export default function CampaignDetailPage() {
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setValidatorDialogOpen(false)}>Cancelar</Button>
                       <Button 
-                        onClick={() => {
-                          console.log('Asignar button clicked');
-                          handleAddValidators();
-                        }} 
+                        onClick={handleAddValidators} 
                         disabled={addingValidators || !selectedPositionForValidator || selectedValidatorUnits.length === 0}
                       >
                         {addingValidators && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
