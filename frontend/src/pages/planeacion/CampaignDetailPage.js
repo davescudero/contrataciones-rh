@@ -354,13 +354,26 @@ export default function CampaignDetailPage() {
           } else if (data) {
             validFacilities.push(data);
           } else {
-            invalidClues.push(clues);
+            invalidClues.push(cluesCode);
           }
         } catch (e) {
-          console.error('Error querying', clues, e);
-          invalidClues.push(clues);
+          console.error('=== DEBUG: Exception querying', cluesCode, e);
+          invalidClues.push(cluesCode);
         }
       }
+
+      // Update debug info with results
+      setDebugInfo(prev => ({ 
+        ...prev, 
+        lastQueryResult: `Found: ${validFacilities.length}, Not found: ${invalidClues.length}`,
+        lastError: lastError ? JSON.stringify(lastError, null, 2) : null,
+        validFacilitiesFound: validFacilities.map(f => ({ id: f.id, clues: f.clues, name: f.name })),
+        invalidCluesList: invalidClues,
+      }));
+
+      console.log('=== DEBUG: processClues results ===');
+      console.log('Valid facilities:', validFacilities);
+      console.log('Invalid CLUES:', invalidClues);
 
       if (invalidClues.length > 0) {
         toast.error(`CLUES no encontradas (${invalidClues.length}): ${invalidClues.slice(0, 3).join(', ')}${invalidClues.length > 3 ? '...' : ''}`);
@@ -370,13 +383,18 @@ export default function CampaignDetailPage() {
         let successCount = 0;
         for (const facility of validFacilities) {
           try {
+            console.log('=== DEBUG: Inserting facility:', facility);
             const { error: insertError } = await supabase
               .from('campaign_authorized_facilities')
               .insert({ campaign_id: id, facility_id: facility.id });
             
-            if (!insertError) successCount++;
+            if (insertError) {
+              console.error('=== DEBUG: Insert error:', insertError);
+            } else {
+              successCount++;
+            }
           } catch (e) {
-            // Ignore duplicates
+            console.error('=== DEBUG: Insert exception:', e);
           }
         }
         
@@ -387,7 +405,8 @@ export default function CampaignDetailPage() {
         }
       }
     } catch (err) {
-      console.error('Error processing CLUES:', err);
+      console.error('=== DEBUG: processClues error:', err);
+      setDebugInfo(prev => ({ ...prev, lastError: err.message || String(err) }));
       toast.error('Error al procesar CLUES');
     } finally {
       setValidatingClues(false);
