@@ -81,11 +81,11 @@ export default function CoordinacionProposalsPage() {
         .select(`
           *,
           campaigns(name),
-          campaign_positions(positions_catalog(name)),
+          positions_catalog(name),
           health_facilities(clues, name)
         `)
-        .eq('created_by', user.id)
-        .order('created_at', { ascending: false });
+        .eq('submitted_by', user.id)
+        .order('submitted_at', { ascending: false });
 
       if (error) throw error;
       setProposals(data || []);
@@ -192,18 +192,19 @@ export default function CoordinacionProposalsPage() {
       const { data: fileRecord, error: fileError } = await supabase
         .from('files')
         .insert([{
-          name: cvFile.name,
+          bucket: 'cvs',
           path: uploadData.path,
-          type: 'cv',
-          mime_type: 'application/pdf',
+          original_name: cvFile.name,
+          mime: 'application/pdf',
           size: cvFile.size,
+          uploaded_by: user.id,
         }])
         .select()
         .single();
 
       if (fileError) throw fileError;
 
-      // 3. Get facility_id from selected
+      // 3. Get CLUES from selected facility
       const facilityRecord = campaignFacilities.find(f => f.id === selectedFacility);
       
       // 4. Create proposal
@@ -211,12 +212,12 @@ export default function CoordinacionProposalsPage() {
         .from('proposals')
         .insert([{
           campaign_id: selectedCampaign.id,
-          campaign_position_id: selectedPosition,
-          facility_id: facilityRecord?.facility_id,
+          position_id: campaignPositions.find(p => p.id === selectedPosition)?.position_id,
+          clues: facilityRecord?.clues || facilityRecord?.health_facilities?.clues,
           curp: curp,
-          file_id: fileRecord.id,
+          cv_file_id: fileRecord.id,
           status: PROPOSAL_STATUS.SUBMITTED,
-          created_by: user.id,
+          submitted_by: user.id,
         }])
         .select()
         .single();
@@ -224,11 +225,12 @@ export default function CoordinacionProposalsPage() {
       if (proposalError) throw proposalError;
 
       // 5. Get validators for this position
+      const positionId = campaignPositions.find(p => p.id === selectedPosition)?.position_id;
       const { data: validators, error: valError } = await supabase
         .from('campaign_validators')
         .select('*')
         .eq('campaign_id', selectedCampaign.id)
-        .eq('campaign_position_id', selectedPosition);
+        .eq('position_id', positionId);
 
       if (valError) throw valError;
 
@@ -237,8 +239,6 @@ export default function CoordinacionProposalsPage() {
         const validationRecords = validators.map(v => ({
           proposal_id: proposal.id,
           validator_unit_id: v.validator_unit_id,
-          is_required: v.is_required,
-          status: 'PENDING',
         }));
 
         const { error: valInsertError } = await supabase
@@ -408,15 +408,12 @@ export default function CoordinacionProposalsPage() {
                       <TableRow key={proposal.id}>
                         <TableCell className="font-mono text-sm">{proposal.curp}</TableCell>
                         <TableCell>{proposal.campaigns?.name || '-'}</TableCell>
-                        <TableCell>{proposal.campaign_positions?.positions_catalog?.name || '-'}</TableCell>
-                        <TableCell className="font-mono text-sm">{proposal.health_facilities?.clues || '-'}</TableCell>
+                        <TableCell>{proposal.positions_catalog?.name || '-'}</TableCell>
+                        <TableCell className="font-mono text-sm">{proposal.clues || proposal.health_facilities?.clues || '-'}</TableCell>
                         <TableCell>
                           {getStatusBadge(proposal.status)}
-                          {proposal.status === PROPOSAL_STATUS.REJECTED && proposal.rejection_reason && (
-                            <p className="text-xs text-red-500 mt-1">{proposal.rejection_reason}</p>
-                          )}
                         </TableCell>
-                        <TableCell className="text-slate-500 text-sm">{formatDate(proposal.created_at)}</TableCell>
+                        <TableCell className="text-slate-500 text-sm">{formatDate(proposal.submitted_at)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

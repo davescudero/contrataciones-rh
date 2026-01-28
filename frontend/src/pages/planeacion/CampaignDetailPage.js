@@ -117,7 +117,7 @@ export default function CampaignDetailPage() {
         // Fetch campaign validators
         const { data: cvData } = await supabase
           .from('campaign_validators')
-          .select('*, validator_units(*), campaign_positions(*, positions_catalog(*))')
+          .select('*, validator_units(*), positions_catalog(*)')
           .eq('campaign_id', id);
         if (isMounted) setCampaignValidators(cvData || []);
 
@@ -154,7 +154,7 @@ export default function CampaignDetailPage() {
   const refreshCampaignValidators = async () => {
     const { data } = await supabase
       .from('campaign_validators')
-      .select('*, validator_units(*), campaign_positions(*, positions_catalog(*))')
+      .select('*, validator_units(*), positions_catalog(*)')
       .eq('campaign_id', id);
     setCampaignValidators(data || []);
   };
@@ -367,15 +367,19 @@ export default function CampaignDetailPage() {
       let successCount = 0;
       let errorCount = 0;
       
+      // Get the position_id from campaign_positions
+      const campaignPosition = campaignPositions.find(cp => String(cp.id) === selectedPositionForValidator);
+      const positionId = campaignPosition?.position_id;
+      
       for (const unitId of selectedValidatorUnits) {
         try {
           const { error } = await supabase
             .from('campaign_validators')
             .insert({
               campaign_id: id,
-              campaign_position_id: selectedPositionForValidator,
+              position_id: positionId,
               validator_unit_id: unitId,
-              is_required: true,
+              required: true,
             });
           
           if (error) {
@@ -757,7 +761,7 @@ export default function CampaignDetailPage() {
                   <TableBody>
                     {campaignValidators.map((cv) => (
                       <TableRow key={cv.id}>
-                        <TableCell>{cv.campaign_positions?.positions_catalog?.name || 'N/A'}</TableCell>
+                        <TableCell>{cv.positions_catalog?.name || 'N/A'}</TableCell>
                         <TableCell>{cv.validator_units?.name || 'N/A'}</TableCell>
                         {canEdit && (
                           <TableCell>

@@ -56,24 +56,24 @@ export default function ValidadorValidationsPage() {
             *,
             curp,
             campaigns(name),
-            campaign_positions(positions_catalog(name)),
+            positions_catalog(name),
             health_facilities(clues, name),
-            files(id, name, path)
+            files:cv_file_id(id, original_name, path)
           )
         `)
-        .eq('status', VALIDATION_STATUS.PENDING);
+        .is('decision', null);
 
       // If user has a validator unit assigned, filter by it
       if (userValidatorUnit?.validator_unit_id) {
         query = query.eq('validator_unit_id', userValidatorUnit.validator_unit_id);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: true });
+      const { data, error } = await query.order('id', { ascending: true });
 
       if (error) throw error;
 
       // Filter only proposals in validation status
-      const filtered = data?.filter(v => v.proposals?.status === PROPOSAL_STATUS.IN_VALIDATION) || [];
+      const filtered = data?.filter(v => v.proposals?.status === PROPOSAL_STATUS.IN_VALIDATION || v.proposals?.status === PROPOSAL_STATUS.SUBMITTED) || [];
       setValidations(filtered);
     } catch (err) {
       console.error('Error fetching validations:', err);
@@ -95,12 +95,13 @@ export default function ValidadorValidationsPage() {
     setRejectionReason('');
 
     // Get signed URL for CV
-    if (validation.proposals?.files?.path) {
+    const cvPath = validation.proposals?.files?.path;
+    if (cvPath) {
       setLoadingCv(true);
       try {
         const { data, error } = await supabase.storage
           .from('cvs')
-          .createSignedUrl(validation.proposals.files.path, 300); // 5 minutes
+          .createSignedUrl(cvPath, 300); // 5 minutes
 
         if (error) throw error;
         setCvUrl(data.signedUrl);
@@ -125,13 +126,14 @@ export default function ValidadorValidationsPage() {
       return;
     }
 
-    // Check if any required validation is rejected
-    const hasRejection = allValidations.some(v => v.is_required && v.status === VALIDATION_STATUS.REJECTED);
+    // Check if any validation is rejected
+    const hasRejection = allValidations.some(v => v.decision === 'REJECTED');
     
-    // Check if all required validations are approved
-    const allRequiredApproved = allValidations
-      .filter(v => v.is_required)
-      .every(v => v.status === VALIDATION_STATUS.APPROVED);
+    // Check if all validations are decided
+    const allDecided = allValidations.every(v => v.decision !== null);
+    
+    // Check if all validations are approved
+    const allApproved = allValidations.every(v => v.decision === 'APPROVED');
 
     if (hasRejection) {
       // Update proposal to REJECTED
@@ -139,7 +141,7 @@ export default function ValidadorValidationsPage() {
         .from('proposals')
         .update({ status: PROPOSAL_STATUS.REJECTED })
         .eq('id', proposalId);
-    } else if (allRequiredApproved) {
+    } else if (allDecided && allApproved) {
       // Update proposal to APPROVED
       await supabase
         .from('proposals')
@@ -155,9 +157,9 @@ export default function ValidadorValidationsPage() {
       const { error } = await supabase
         .from('proposal_validations')
         .update({ 
-          status: VALIDATION_STATUS.APPROVED,
-          validated_at: new Date().toISOString(),
-          validated_by: user.id,
+          decision: 'APPROVED',
+          decided_at: new Date().toISOString(),
+          decided_by: user.id,
         })
         .eq('id', selectedValidation.id);
 
@@ -188,10 +190,10 @@ export default function ValidadorValidationsPage() {
       const { error } = await supabase
         .from('proposal_validations')
         .update({ 
-          status: VALIDATION_STATUS.REJECTED,
-          rejection_reason: rejectionReason.trim(),
-          validated_at: new Date().toISOString(),
-          validated_by: user.id,
+          decision: 'REJECTED',
+          reason: rejectionReason.trim(),
+          decided_at: new Date().toISOString(),
+          decided_by: user.id,
         })
         .eq('id', selectedValidation.id);
 
