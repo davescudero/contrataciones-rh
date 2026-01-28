@@ -68,16 +68,25 @@ const MENU_ITEMS = [
 ];
 
 export default function HomePage() {
-  const { user, userRoles, hasAnyRole } = useAuth();
+  const { user, userRoles, rolesDebug, hasAnyRole } = useAuth();
 
   const visibleMenuItems = MENU_ITEMS.filter(item => hasAnyRole(item.roles));
 
   return (
     <div className="space-y-8" data-testid="home-page">
       {/* Debug Info */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 font-mono text-xs" data-testid="debug-info">
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 font-mono text-xs space-y-2" data-testid="debug-info">
         <p><strong>DEBUG - User ID:</strong> {user?.id || 'N/A'}</p>
         <p><strong>DEBUG - Email:</strong> {user?.email || 'N/A'}</p>
+        <p><strong>DEBUG - Roles Array:</strong> {JSON.stringify(userRoles)}</p>
+        {rolesDebug && (
+          <details className="mt-2">
+            <summary className="cursor-pointer text-amber-700 font-semibold">Ver detalles de carga de roles</summary>
+            <pre className="mt-2 p-2 bg-white rounded text-xs overflow-auto max-h-64">
+              {JSON.stringify(rolesDebug, null, 2)}
+            </pre>
+          </details>
+        )}
       </div>
 
       {/* Welcome Section */}
