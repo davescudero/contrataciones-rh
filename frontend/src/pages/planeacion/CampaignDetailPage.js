@@ -677,7 +677,9 @@ export default function CampaignDetailPage() {
               {canEdit && campaignPositions.length > 0 && (
                 <Dialog open={validatorDialogOpen} onOpenChange={setValidatorDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button size="sm"><Plus className="w-4 h-4 mr-2" />Asignar</Button>
+                    <Button size="sm" onClick={() => console.log('Opening validator dialog')}>
+                      <Plus className="w-4 h-4 mr-2" />Asignar
+                    </Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
@@ -686,11 +688,17 @@ export default function CampaignDetailPage() {
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
                         <Label>Posición</Label>
-                        <Select value={selectedPositionForValidator} onValueChange={setSelectedPositionForValidator}>
+                        <Select 
+                          value={selectedPositionForValidator} 
+                          onValueChange={(val) => {
+                            console.log('Position selected:', val);
+                            setSelectedPositionForValidator(val);
+                          }}
+                        >
                           <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                           <SelectContent>
                             {campaignPositions.map(cp => (
-                              <SelectItem key={cp.id} value={cp.id}>{cp.positions_catalog?.name}</SelectItem>
+                              <SelectItem key={cp.id} value={String(cp.id)}>{cp.positions_catalog?.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -705,10 +713,12 @@ export default function CampaignDetailPage() {
                               <div key={unit.id} className="flex items-center space-x-2">
                                 <Checkbox
                                   id={`unit-${unit.id}`}
-                                  checked={selectedValidatorUnits.includes(unit.id)}
+                                  checked={selectedValidatorUnits.includes(String(unit.id))}
                                   onCheckedChange={(checked) => {
+                                    const unitIdStr = String(unit.id);
+                                    console.log('Checkbox changed:', unitIdStr, checked);
                                     setSelectedValidatorUnits(prev => 
-                                      checked ? [...prev, unit.id] : prev.filter(id => id !== unit.id)
+                                      checked ? [...prev, unitIdStr] : prev.filter(id => id !== unitIdStr)
                                     );
                                   }}
                                 />
@@ -721,7 +731,13 @@ export default function CampaignDetailPage() {
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setValidatorDialogOpen(false)}>Cancelar</Button>
-                      <Button onClick={handleAddValidators} disabled={addingValidators}>
+                      <Button 
+                        onClick={() => {
+                          console.log('Asignar button clicked');
+                          handleAddValidators();
+                        }} 
+                        disabled={addingValidators || !selectedPositionForValidator || selectedValidatorUnits.length === 0}
+                      >
                         {addingValidators && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                         Asignar
                       </Button>
