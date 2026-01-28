@@ -70,9 +70,61 @@ export default function CampaignDetailPage() {
   const isEditable = campaign?.status === CAMPAIGN_STATUS.DRAFT;
   const canEdit = hasRole(ROLES.PLANEACION) && isEditable;
 
+  // Check session status for debug
+  const checkSessionStatus = async () => {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('Session check error:', error);
+      setDebugInfo(prev => ({ ...prev, sessionStatus: 'Error: ' + error.message }));
+    } else if (session) {
+      setDebugInfo(prev => ({ 
+        ...prev, 
+        sessionStatus: 'Logged in',
+        sessionUser: session.user?.id,
+        sessionEmail: session.user?.email,
+      }));
+    } else {
+      setDebugInfo(prev => ({ ...prev, sessionStatus: 'Not logged in (no session)' }));
+    }
+  };
+
+  // Debug test query for health_facilities
+  const testHealthFacilitiesQuery = async () => {
+    const queryDescription = "supabase.from('health_facilities').select('*').limit(5)";
+    setDebugInfo(prev => ({ ...prev, lastQuery: queryDescription, lastQueryResult: 'Loading...', lastError: null }));
+    
+    console.log('=== DEBUG: Testing health_facilities query ===');
+    console.log('Query:', queryDescription);
+    
+    const { data, error } = await supabase
+      .from('health_facilities')
+      .select('*')
+      .limit(5);
+    
+    if (error) {
+      console.error('=== DEBUG: health_facilities query ERROR ===', error);
+      setDebugInfo(prev => ({ 
+        ...prev, 
+        lastQueryResult: `ERROR - ${error.message}`,
+        lastError: JSON.stringify(error, null, 2)
+      }));
+    } else {
+      console.log('=== DEBUG: health_facilities query SUCCESS ===', data);
+      setDebugInfo(prev => ({ 
+        ...prev, 
+        lastQueryResult: `SUCCESS - ${data?.length || 0} rows returned`,
+        lastError: null,
+        sampleData: data?.slice(0, 2)
+      }));
+    }
+  };
+
   // Load all data on mount
   useEffect(() => {
     let isMounted = true;
+    
+    // Check session on mount
+    checkSessionStatus();
 
     const loadAllData = async () => {
       setLoading(true);
