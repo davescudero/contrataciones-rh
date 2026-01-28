@@ -132,17 +132,22 @@ export const Layout = ({ children }) => {
 
             {/* User Menu */}
             <div className="flex items-center gap-2">
-              {/* Direct Logout Button for debugging */}
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleSignOut}
-                className="text-red-600 border-red-200 hover:bg-red-50"
+              {/* Direct Logout Link - más confiable */}
+              <a 
+                href="/login"
+                onClick={(e) => {
+                  e.preventDefault();
+                  // Clear localStorage directly
+                  localStorage.removeItem('sb-gnvyhxmbvzvqkjslqiur-auth-token');
+                  // Force reload to login
+                  window.location.href = '/login';
+                }}
+                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 cursor-pointer"
                 data-testid="direct-logout-btn"
               >
                 <LogOut className="w-4 h-4 mr-1" />
                 Salir
-              </Button>
+              </a>
 
               {/* Mobile Menu */}
               <DropdownMenu>
