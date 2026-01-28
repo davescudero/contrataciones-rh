@@ -176,7 +176,10 @@ export const Layout = ({ children }) => {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
-                    onClick={handleSignOut}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      handleSignOut();
+                    }}
                     className="text-red-600 focus:text-red-600 cursor-pointer"
                     data-testid="logout-btn"
                   >
