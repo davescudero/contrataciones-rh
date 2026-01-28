@@ -24,19 +24,27 @@ import { Alert, AlertDescription } from '../../components/ui/alert';
 import { toast } from 'sonner';
 import { 
   ArrowLeft, Save, Send, Plus, Trash2, Loader2, 
-  Briefcase, Building2, UserCheck, Lock, Upload
+  Briefcase, Building2, UserCheck, Lock, Upload, Bug
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABELS, ROLES } from '../../lib/constants';
 
 export default function CampaignDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Debug state
+  const [debugInfo, setDebugInfo] = useState({
+    sessionStatus: 'checking...',
+    lastQuery: null,
+    lastQueryResult: null,
+    lastError: null,
+  });
   
   // Positions
   const [positions, setPositions] = useState([]);
