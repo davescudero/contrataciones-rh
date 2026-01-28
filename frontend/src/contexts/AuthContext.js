@@ -8,40 +8,79 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userRoles, setUserRoles] = useState([]);
+  const [rolesDebug, setRolesDebug] = useState(null);
   const [loading, setLoading] = useState(true);
   const signInInProgress = useRef(false);
 
   const fetchUserRoles = useCallback(async (userId) => {
     console.log('=== DEBUG: Fetching roles for user_id:', userId);
     
+    const debugInfo = { userId, steps: [] };
+    
     try {
-      const { data, error } = await supabase
+      // Step 1: Get user_roles records
+      debugInfo.steps.push('Fetching user_roles...');
+      const { data: userRolesData, error: userRolesError } = await supabase
         .from('user_roles')
-        .select(`
-          role_id,
-          roles (
-            id,
-            name,
-            description
-          )
-        `)
+        .select('*')
         .eq('user_id', userId);
 
-      console.log('=== DEBUG: user_roles query result:');
-      console.log('  - Raw data:', JSON.stringify(data, null, 2));
-      console.log('  - Error:', error ? JSON.stringify(error, null, 2) : 'none');
+      debugInfo.userRolesResult = { data: userRolesData, error: userRolesError };
+      console.log('=== DEBUG: user_roles result:', JSON.stringify({ data: userRolesData, error: userRolesError }, null, 2));
 
-      if (error) {
-        console.error('Error fetching user roles:', error);
+      if (userRolesError) {
+        debugInfo.steps.push('Error in user_roles query: ' + userRolesError.message);
+        setRolesDebug(debugInfo);
         return [];
       }
 
-      const roles = data?.map(ur => ur.roles?.name).filter(Boolean) || [];
-      console.log('=== DEBUG: Extracted role names:', roles);
+      if (!userRolesData || userRolesData.length === 0) {
+        debugInfo.steps.push('No user_roles records found');
+        setRolesDebug(debugInfo);
+        return [];
+      }
+
+      // Step 2: Get role_ids from user_roles
+      const roleIds = userRolesData.map(ur => ur.role_id).filter(Boolean);
+      debugInfo.roleIds = roleIds;
+      debugInfo.steps.push('Found role_ids: ' + JSON.stringify(roleIds));
+
+      if (roleIds.length === 0) {
+        debugInfo.steps.push('No role_ids found in user_roles');
+        setRolesDebug(debugInfo);
+        return [];
+      }
+
+      // Step 3: Get roles by ids
+      debugInfo.steps.push('Fetching roles by ids...');
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('roles')
+        .select('*')
+        .in('id', roleIds);
+
+      debugInfo.rolesResult = { data: rolesData, error: rolesError };
+      console.log('=== DEBUG: roles result:', JSON.stringify({ data: rolesData, error: rolesError }, null, 2));
+
+      if (rolesError) {
+        debugInfo.steps.push('Error in roles query: ' + rolesError.message);
+        setRolesDebug(debugInfo);
+        return [];
+      }
+
+      // Step 4: Extract role names
+      const roleNames = rolesData?.map(r => r.name).filter(Boolean) || [];
+      debugInfo.roleNames = roleNames;
+      debugInfo.steps.push('Extracted role names: ' + JSON.stringify(roleNames));
       
-      return roles;
+      setRolesDebug(debugInfo);
+      console.log('=== DEBUG: Final role names:', roleNames);
+      
+      return roleNames;
     } catch (err) {
       console.error('=== DEBUG: Catch error fetching roles:', err);
+      debugInfo.steps.push('Exception: ' + err.message);
+      debugInfo.exception = err.message;
+      setRolesDebug(debugInfo);
       return [];
     }
   }, []);
@@ -51,10 +90,14 @@ export const AuthProvider = ({ children }) => {
 
     const init = async () => {
       try {
+        console.log('=== DEBUG: Initializing auth...');
         const { data: { session } } = await supabase.auth.getSession();
+        console.log('=== DEBUG: Session:', session ? 'exists' : 'null');
+        
         if (!mounted) return;
 
         if (session?.user) {
+          console.log('=== DEBUG: User found, id:', session.user.id);
           setUser(session.user);
           const roles = await fetchUserRoles(session.user.id);
           if (mounted) setUserRoles(roles);
@@ -69,9 +112,9 @@ export const AuthProvider = ({ children }) => {
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('=== DEBUG: Auth state change:', event);
       if (!mounted) return;
       
-      // Skip SIGNED_IN event if we're handling it in signIn function
       if (signInInProgress.current && event === 'SIGNED_IN') {
         return;
       }
@@ -79,6 +122,7 @@ export const AuthProvider = ({ children }) => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserRoles([]);
+        setRolesDebug(null);
       } else if (session?.user) {
         setUser(session.user);
         const roles = await fetchUserRoles(session.user.id);
@@ -98,7 +142,6 @@ export const AuthProvider = ({ children }) => {
     signInInProgress.current = true;
     
     try {
-      // Clone the response to avoid "body already read" error
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -108,7 +151,6 @@ export const AuthProvider = ({ children }) => {
         signInInProgress.current = false;
         let errorMessage = error.message;
         
-        // Handle "body stream already read" error - this means credentials are invalid
         if (errorMessage.includes('body stream')) {
           errorMessage = 'Credenciales inválidas. Verifica tu correo y contraseña.';
         } else if (errorMessage === 'Invalid login credentials') {
@@ -130,8 +172,6 @@ export const AuthProvider = ({ children }) => {
       signInInProgress.current = false;
       console.error('SignIn error:', err);
       
-      // The "body stream already read" error is thrown when credentials are invalid
-      // because Supabase internally tries to read the error response twice
       const errorMessage = err.message?.includes('body stream') 
         ? 'Credenciales inválidas. Verifica tu correo y contraseña.'
         : 'Error de conexión. Intenta de nuevo.';
@@ -145,11 +185,13 @@ export const AuthProvider = ({ children }) => {
       await supabase.auth.signOut();
       setUser(null);
       setUserRoles([]);
+      setRolesDebug(null);
       return { error: null };
     } catch (err) {
       console.error('SignOut error:', err);
       setUser(null);
       setUserRoles([]);
+      setRolesDebug(null);
       return { error: null };
     }
   };
@@ -165,6 +207,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     userRoles,
+    rolesDebug,
     loading,
     signIn,
     signOut,
