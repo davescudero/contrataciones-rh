@@ -263,31 +263,48 @@ export default function CampaignDetailPage() {
 
     setValidatingClues(true);
     try {
-      const { data: validFacilities, error } = await supabase
-        .from('health_facilities')
-        .select('id, clues, name')
-        .in('clues', cluesList);
+      // Query one by one to avoid body stream error
+      const validFacilities = [];
+      const invalidClues = [];
 
-      if (error) {
-        toast.error('Error al buscar CLUES: ' + error.message);
-        return;
+      for (const clues of cluesList) {
+        try {
+          const { data, error } = await supabase
+            .from('health_facilities')
+            .select('id, clues, name')
+            .eq('clues', clues)
+            .maybeSingle();
+
+          if (error) {
+            console.error('Query error for', clues, error);
+            invalidClues.push(clues);
+          } else if (data) {
+            validFacilities.push(data);
+          } else {
+            invalidClues.push(clues);
+          }
+        } catch (e) {
+          console.error('Error querying', clues, e);
+          invalidClues.push(clues);
+        }
       }
-
-      const validClues = validFacilities?.map(f => f.clues) || [];
-      const invalidClues = cluesList.filter(c => !validClues.includes(c));
 
       if (invalidClues.length > 0) {
-        toast.error(`CLUES no encontradas (${invalidClues.length}): ${invalidClues.slice(0, 3).join(', ')}...`);
+        toast.error(`CLUES no encontradas (${invalidClues.length}): ${invalidClues.slice(0, 3).join(', ')}${invalidClues.length > 3 ? '...' : ''}`);
       }
 
-      if (validFacilities && validFacilities.length > 0) {
+      if (validFacilities.length > 0) {
         let successCount = 0;
         for (const facility of validFacilities) {
-          const { error: insertError } = await supabase
-            .from('campaign_authorized_facilities')
-            .insert({ campaign_id: id, facility_id: facility.id });
-          
-          if (!insertError) successCount++;
+          try {
+            const { error: insertError } = await supabase
+              .from('campaign_authorized_facilities')
+              .insert({ campaign_id: id, facility_id: facility.id });
+            
+            if (!insertError) successCount++;
+          } catch (e) {
+            // Ignore duplicates
+          }
         }
         
         if (successCount > 0) {
