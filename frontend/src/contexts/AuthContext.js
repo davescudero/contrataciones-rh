@@ -8,81 +8,49 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userRoles, setUserRoles] = useState([]);
-  const [rolesDebug, setRolesDebug] = useState(null);
   const [loading, setLoading] = useState(true);
   const signInInProgress = useRef(false);
 
   const fetchUserRoles = useCallback(async (userId) => {
-    console.log('=== DEBUG: Fetching roles for user_id:', userId);
-    
-    const debugInfo = { userId, steps: [], timestamp: new Date().toISOString() };
-    
     try {
-      // Step 1: Get user_roles records
-      debugInfo.steps.push('Fetching user_roles...');
-      
+      // Get user_roles records
       const { data: userRolesData, error: userRolesError } = await supabase
         .from('user_roles')
         .select('*')
         .eq('user_id', userId);
 
-      debugInfo.userRolesResult = { data: userRolesData, error: userRolesError?.message || null };
-      console.log('=== DEBUG: user_roles result:', JSON.stringify(debugInfo.userRolesResult, null, 2));
-
       if (userRolesError) {
-        debugInfo.steps.push('Error in user_roles query: ' + userRolesError.message);
-        setRolesDebug(debugInfo);
+        console.error('Error fetching user_roles:', userRolesError.message);
         return [];
       }
 
       if (!userRolesData || userRolesData.length === 0) {
-        debugInfo.steps.push('No user_roles records found for this user');
-        setRolesDebug(debugInfo);
         return [];
       }
 
-      // Step 2: Get role_ids from user_roles
+      // Get role_ids from user_roles
       const roleIds = userRolesData.map(ur => ur.role_id).filter(Boolean);
-      debugInfo.roleIds = roleIds;
-      debugInfo.steps.push('Found role_ids: ' + JSON.stringify(roleIds));
 
       if (roleIds.length === 0) {
-        debugInfo.steps.push('No role_ids found in user_roles');
-        setRolesDebug(debugInfo);
         return [];
       }
 
-      // Step 3: Get roles by ids
-      debugInfo.steps.push('Fetching roles by ids...');
+      // Get roles by ids
       const { data: rolesData, error: rolesError } = await supabase
         .from('roles')
         .select('*')
         .in('id', roleIds);
 
-      debugInfo.rolesResult = { data: rolesData, error: rolesError?.message || null };
-      console.log('=== DEBUG: roles result:', JSON.stringify(debugInfo.rolesResult, null, 2));
-
       if (rolesError) {
-        debugInfo.steps.push('Error in roles query: ' + rolesError.message);
-        setRolesDebug(debugInfo);
+        console.error('Error fetching roles:', rolesError.message);
         return [];
       }
 
-      // Step 4: Extract role names
+      // Extract role names
       const roleNames = rolesData?.map(r => r.name).filter(Boolean) || [];
-      debugInfo.roleNames = roleNames;
-      debugInfo.steps.push('Extracted role names: ' + JSON.stringify(roleNames));
-      debugInfo.success = true;
-      
-      setRolesDebug(debugInfo);
-      console.log('=== DEBUG: Final role names:', roleNames);
-      
       return roleNames;
     } catch (err) {
-      console.error('=== DEBUG: Catch error fetching roles:', err);
-      debugInfo.steps.push('Exception: ' + err.message);
-      debugInfo.exception = err.message;
-      setRolesDebug(debugInfo);
+      console.error('Error fetching user roles:', err);
       return [];
     }
   }, []);
@@ -92,42 +60,31 @@ export const AuthProvider = ({ children }) => {
     let timeoutId = null;
 
     const init = async () => {
-      console.log('=== DEBUG: Starting auth initialization...');
-      
-      // Force loading to false after 10 seconds no matter what
+      // Force loading to false after 10 seconds as fallback
       timeoutId = setTimeout(() => {
-        console.log('=== DEBUG: Force timeout - setting loading=false');
         if (mounted) setLoading(false);
       }, 10000);
 
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        console.log('=== DEBUG: getSession result:', { 
-          hasSession: !!session, 
-          hasUser: !!session?.user,
-          error: sessionError?.message 
-        });
-        
         if (!mounted) return;
 
         if (sessionError) {
-          console.error('=== DEBUG: Session error:', sessionError);
+          console.error('Session error:', sessionError);
         } else if (session?.user) {
-          console.log('=== DEBUG: User found, id:', session.user.id);
           setUser(session.user);
           
           try {
             const roles = await fetchUserRoles(session.user.id);
             if (mounted) setUserRoles(roles);
           } catch (rolesErr) {
-            console.error('=== DEBUG: Roles fetch error:', rolesErr);
+            console.error('Roles fetch error:', rolesErr);
           }
         }
       } catch (err) {
-        console.error('=== DEBUG: Init error:', err);
+        console.error('Auth init error:', err);
       } finally {
-        console.log('=== DEBUG: Init finally - setting loading=false');
         if (mounted) {
           clearTimeout(timeoutId);
           setLoading(false);
@@ -138,7 +95,6 @@ export const AuthProvider = ({ children }) => {
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('=== DEBUG: Auth state change:', event);
       if (!mounted) return;
       
       if (signInInProgress.current && event === 'SIGNED_IN') {
@@ -148,7 +104,6 @@ export const AuthProvider = ({ children }) => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserRoles([]);
-        setRolesDebug(null);
       } else if (session?.user) {
         setUser(session.user);
         try {
@@ -220,13 +175,11 @@ export const AuthProvider = ({ children }) => {
       await supabase.auth.signOut();
       setUser(null);
       setUserRoles([]);
-      setRolesDebug(null);
       return { error: null };
     } catch (err) {
       console.error('SignOut error:', err);
       setUser(null);
       setUserRoles([]);
-      setRolesDebug(null);
       return { error: null };
     }
   };
@@ -242,7 +195,6 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     userRoles,
-    rolesDebug,
     loading,
     signIn,
     signOut,
