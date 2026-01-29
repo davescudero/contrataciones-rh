@@ -16,6 +16,7 @@ import {
   Eye, RefreshCw, CheckCircle, XCircle, Loader2, FileWarning
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABELS } from '../../lib/constants';
+import logger from '../../lib/logger';
 
 export default function AtencionSaludReviewPage() {
   const [campaigns, setCampaigns] = useState([]);
@@ -38,7 +39,7 @@ export default function AtencionSaludReviewPage() {
       if (error) throw error;
       setCampaigns(data || []);
     } catch (err) {
-      console.error('Error fetching campaigns:', err);
+      logger.error('ReviewPage', 'Error fetching campaigns', err);
       toast.error('Error al cargar las campañas');
     } finally {
       setLoading(false);
@@ -74,7 +75,7 @@ export default function AtencionSaludReviewPage() {
         facilitiesCount: facilities?.length || 0,
       });
     } catch (err) {
-      console.error('Error fetching campaign details:', err);
+      logger.error('ReviewPage', 'Error fetching campaign details', err);
       toast.error('Error al cargar detalles');
     } finally {
       setLoadingDetails(false);
@@ -101,7 +102,7 @@ export default function AtencionSaludReviewPage() {
       setDetailDialogOpen(false);
       fetchCampaigns();
     } catch (err) {
-      console.error('Error approving campaign:', err);
+      logger.error('ReviewPage', 'Error approving campaign', err);
       toast.error('Error al aprobar la campaña');
     } finally {
       setProcessing(false);
@@ -122,7 +123,7 @@ export default function AtencionSaludReviewPage() {
       setDetailDialogOpen(false);
       fetchCampaigns();
     } catch (err) {
-      console.error('Error rejecting campaign:', err);
+      logger.error('ReviewPage', 'Error rejecting campaign', err);
       toast.error('Error al regresar la campaña');
     } finally {
       setProcessing(false);

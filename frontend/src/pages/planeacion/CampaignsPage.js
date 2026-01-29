@@ -20,6 +20,7 @@ import {
   Plus, ClipboardList, Loader2, FileWarning, RefreshCw, Eye
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABELS, ROLES } from '../../lib/constants';
+import logger from '../../lib/logger';
 
 export default function PlaneacionCampaignsPage() {
   const [campaigns, setCampaigns] = useState([]);
@@ -43,7 +44,7 @@ export default function PlaneacionCampaignsPage() {
       if (error) throw error;
       setCampaigns(data || []);
     } catch (err) {
-      console.error('Error fetching campaigns:', err);
+      logger.error('CampaignsPage', 'Error fetching campaigns', err);
       toast.error('Error al cargar las campañas');
     } finally {
       setLoading(false);
@@ -75,7 +76,7 @@ export default function PlaneacionCampaignsPage() {
       setNewCampaignName('');
       navigate(`/planeacion/campaigns/${data.id}`);
     } catch (err) {
-      console.error('Error creating campaign:', err);
+      logger.error('CampaignsPage', 'Error creating campaign', err);
       toast.error('Error al crear la campaña');
     } finally {
       setCreating(false);

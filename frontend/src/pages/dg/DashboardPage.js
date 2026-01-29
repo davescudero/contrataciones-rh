@@ -8,6 +8,7 @@ import {
   BarChart3, RefreshCw, Megaphone, FileText, CheckCircle, Clock, XCircle
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, PROPOSAL_STATUS } from '../../lib/constants';
+import logger from '../../lib/logger';
 
 export default function DGDashboardPage() {
   const [stats, setStats] = useState(null);
@@ -50,7 +51,7 @@ export default function DGDashboardPage() {
         proposalsByStatus,
       });
     } catch (err) {
-      console.error('Error fetching stats:', err);
+      logger.error('DGDashboard', 'Error fetching stats', err);
       toast.error('Error al cargar estadísticas');
     } finally {
       setLoading(false);

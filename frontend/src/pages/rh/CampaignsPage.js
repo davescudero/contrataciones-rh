@@ -17,6 +17,7 @@ import {
   Megaphone, RefreshCw, Play, Pause, Loader2, FileWarning
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABELS } from '../../lib/constants';
+import logger from '../../lib/logger';
 
 export default function RHCampaignsPage() {
   const [campaigns, setCampaigns] = useState([]);
@@ -35,7 +36,7 @@ export default function RHCampaignsPage() {
       if (error) throw error;
       setCampaigns(data || []);
     } catch (err) {
-      console.error('Error fetching campaigns:', err);
+      logger.error('RHCampaigns', 'Error fetching campaigns', err);
       toast.error('Error al cargar las campañas');
     } finally {
       setLoading(false);
@@ -58,7 +59,7 @@ export default function RHCampaignsPage() {
       toast.success('Campaña activada exitosamente');
       fetchCampaigns();
     } catch (err) {
-      console.error('Error activating campaign:', err);
+      logger.error('RHCampaigns', 'Error activating campaign', err);
       toast.error('Error al activar la campaña');
     } finally {
       setProcessing(null);
@@ -77,7 +78,7 @@ export default function RHCampaignsPage() {
       toast.success('Campaña desactivada');
       fetchCampaigns();
     } catch (err) {
-      console.error('Error deactivating campaign:', err);
+      logger.error('RHCampaigns', 'Error deactivating campaign', err);
       toast.error('Error al desactivar la campaña');
     } finally {
       setProcessing(null);

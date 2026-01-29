@@ -41,6 +41,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import logger from '../lib/logger';
 
 const campaignSchema = z.object({
   name: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
@@ -84,7 +85,7 @@ export default function CampaignsPage() {
       if (error) throw error;
       setCampaigns(data || []);
     } catch (err) {
-      console.error('Error fetching campaigns:', err);
+      logger.error('CampaignsPage', 'Error fetching campaigns', err);
       toast.error('Error al cargar las campañas');
     } finally {
       setLoading(false);
@@ -119,7 +120,7 @@ export default function CampaignsPage() {
       setEndDate(null);
       fetchCampaigns();
     } catch (err) {
-      console.error('Error creating campaign:', err);
+      logger.error('CampaignsPage', 'Error creating campaign', err);
       toast.error('Error al crear la campaña');
     } finally {
       setCreating(false);

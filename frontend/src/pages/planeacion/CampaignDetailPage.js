@@ -26,6 +26,7 @@ import {
   Briefcase, Building2, UserCheck, Lock, Upload
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABELS, ROLES } from '../../lib/constants';
+import logger from '../../lib/logger';
 
 export default function CampaignDetailPage() {
   const { id } = useParams();
@@ -77,7 +78,7 @@ export default function CampaignDetailPage() {
           .single();
 
         if (campaignError) {
-          console.error('Error fetching campaign:', campaignError);
+          logger.error('CampaignDetailPage', 'Error fetching campaign', campaignError);
           toast.error('Error al cargar la campaña');
           navigate('/planeacion/campaigns');
           return;
@@ -121,7 +122,7 @@ export default function CampaignDetailPage() {
         if (isMounted) setCampaignValidators(cvData || []);
 
       } catch (err) {
-        console.error('Error loading data:', err);
+        logger.error('CampaignDetailPage', 'Error loading data', err);
         toast.error('Error al cargar datos');
       } finally {
         if (isMounted) setLoading(false);
@@ -172,7 +173,7 @@ export default function CampaignDetailPage() {
       if (error) throw error;
       toast.success('Campaña actualizada');
     } catch (err) {
-      console.error('Error saving campaign:', err);
+      logger.error('CampaignDetailPage', 'Error saving campaign', err);
       toast.error('Error al guardar: ' + (err.message || ''));
     } finally {
       setSaving(false);
@@ -199,7 +200,7 @@ export default function CampaignDetailPage() {
       toast.success('Campaña enviada a revisión');
       setCampaign(prev => ({ ...prev, status: CAMPAIGN_STATUS.UNDER_REVIEW }));
     } catch (err) {
-      console.error('Error submitting campaign:', err);
+      logger.error('CampaignDetailPage', 'Error submitting campaign', err);
       toast.error('Error al enviar a revisión: ' + (err.message || ''));
     } finally {
       setSubmitting(false);
@@ -228,7 +229,7 @@ export default function CampaignDetailPage() {
       setSlotsAuthorized('');
       await refreshCampaignPositions();
     } catch (err) {
-      console.error('Error adding position:', err);
+      logger.error('CampaignDetailPage', 'Error adding position', err);
       toast.error('Error al agregar posición: ' + (err.message || ''));
     } finally {
       setAddingPosition(false);
@@ -246,7 +247,7 @@ export default function CampaignDetailPage() {
       await refreshCampaignPositions();
       await refreshCampaignValidators();
     } catch (err) {
-      console.error('Error removing position:', err);
+      logger.error('CampaignDetailPage', 'Error removing position', err);
       toast.error('Error al eliminar: ' + (err.message || ''));
     }
   };
@@ -275,7 +276,7 @@ export default function CampaignDetailPage() {
             .maybeSingle();
 
           if (error) {
-            console.error('Query error for CLUES:', cluesCode, error);
+            logger.error('CampaignDetailPage', 'Query error for CLUES: ' + cluesCode, error);
             invalidClues.push(cluesCode);
           } else if (data) {
             validFacilities.push(data);
@@ -283,7 +284,7 @@ export default function CampaignDetailPage() {
             invalidClues.push(cluesCode);
           }
         } catch (e) {
-          console.error('Exception querying CLUES:', cluesCode, e);
+          logger.error('CampaignDetailPage', 'Exception querying CLUES: ' + cluesCode, e);
           invalidClues.push(cluesCode);
         }
       }
@@ -302,12 +303,12 @@ export default function CampaignDetailPage() {
               .insert({ campaign_id: Number.isNaN(campaignId) ? id : campaignId, clues: facility.clues });
             
             if (insertError) {
-              console.error('Insert facility error:', insertError);
+              logger.error('CampaignDetailPage', 'Insert facility error', insertError);
             } else {
               successCount++;
             }
           } catch (e) {
-            console.error('Insert facility exception:', e);
+            logger.error('CampaignDetailPage', 'Insert facility exception', e);
           }
         }
         
@@ -318,7 +319,7 @@ export default function CampaignDetailPage() {
         }
       }
     } catch (err) {
-      console.error('Error processing CLUES:', err);
+      logger.error('CampaignDetailPage', 'Error processing CLUES', err);
       toast.error('Error al procesar CLUES');
     } finally {
       setValidatingClues(false);
@@ -350,7 +351,7 @@ export default function CampaignDetailPage() {
       toast.success('CLUES eliminada');
       await refreshAuthorizedFacilities();
     } catch (err) {
-      console.error('Error removing facility:', err);
+      logger.error('CampaignDetailPage', 'Error removing facility', err);
       toast.error('Error al eliminar: ' + (err.message || ''));
     }
   };
@@ -382,13 +383,13 @@ export default function CampaignDetailPage() {
             });
           
           if (error) {
-            console.error('Insert validator error:', error);
+            logger.error('CampaignDetailPage', 'Insert validator error', error);
             errorCount++;
           } else {
             successCount++;
           }
         } catch (e) {
-          console.error('Exception inserting validator:', e);
+          logger.error('CampaignDetailPage', 'Exception inserting validator', e);
           errorCount++;
         }
       }
@@ -405,7 +406,7 @@ export default function CampaignDetailPage() {
       setSelectedValidatorUnits([]);
       await refreshCampaignValidators();
     } catch (err) {
-      console.error('Error adding validators:', err);
+      logger.error('CampaignDetailPage', 'Error adding validators', err);
       toast.error('Error al asignar validadores: ' + (err.message || ''));
     } finally {
       setAddingValidators(false);
@@ -422,7 +423,7 @@ export default function CampaignDetailPage() {
       toast.success('Validador eliminado');
       await refreshCampaignValidators();
     } catch (err) {
-      console.error('Error removing validator:', err);
+      logger.error('CampaignDetailPage', 'Error removing validator', err);
       toast.error('Error al eliminar');
     }
   };

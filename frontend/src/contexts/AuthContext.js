@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import logger from '../lib/logger';
 
 const AuthContext = createContext({});
 
@@ -9,9 +10,11 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userRoles, setUserRoles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [rolesLoading, setRolesLoading] = useState(false);
   const signInInProgress = useRef(false);
 
   const fetchUserRoles = useCallback(async (userId) => {
+    setRolesLoading(true);
     try {
       // Get user_roles records
       const { data: userRolesData, error: userRolesError } = await supabase
@@ -20,7 +23,7 @@ export const AuthProvider = ({ children }) => {
         .eq('user_id', userId);
 
       if (userRolesError) {
-        console.error('Error fetching user_roles:', userRolesError.message);
+        logger.error('AuthContext', 'Error fetching user_roles', userRolesError);
         return [];
       }
 
@@ -42,7 +45,7 @@ export const AuthProvider = ({ children }) => {
         .in('id', roleIds);
 
       if (rolesError) {
-        console.error('Error fetching roles:', rolesError.message);
+        logger.error('AuthContext', 'Error fetching roles', rolesError);
         return [];
       }
 
@@ -50,8 +53,10 @@ export const AuthProvider = ({ children }) => {
       const roleNames = rolesData?.map(r => r.name).filter(Boolean) || [];
       return roleNames;
     } catch (err) {
-      console.error('Error fetching user roles:', err);
+      logger.error('AuthContext', 'Error fetching user roles', err);
       return [];
+    } finally {
+      setRolesLoading(false);
     }
   }, []);
 
@@ -71,7 +76,7 @@ export const AuthProvider = ({ children }) => {
         if (!mounted) return;
 
         if (sessionError) {
-          console.error('Session error:', sessionError);
+          logger.error('AuthContext', 'Session error', sessionError);
         } else if (session?.user) {
           setUser(session.user);
           
@@ -79,11 +84,11 @@ export const AuthProvider = ({ children }) => {
             const roles = await fetchUserRoles(session.user.id);
             if (mounted) setUserRoles(roles);
           } catch (rolesErr) {
-            console.error('Roles fetch error:', rolesErr);
+            logger.error('AuthContext', 'Roles fetch error', rolesErr);
           }
         }
       } catch (err) {
-        console.error('Auth init error:', err);
+        logger.error('AuthContext', 'Auth init error', err);
       } finally {
         if (mounted) {
           clearTimeout(timeoutId);
@@ -97,6 +102,7 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
+      // Skip if signIn is handling this event
       if (signInInProgress.current && event === 'SIGNED_IN') {
         return;
       }
@@ -110,7 +116,7 @@ export const AuthProvider = ({ children }) => {
           const roles = await fetchUserRoles(session.user.id);
           if (mounted) setUserRoles(roles);
         } catch (err) {
-          console.error('Roles fetch error on auth change:', err);
+          logger.error('AuthContext', 'Roles fetch error on auth change', err);
         }
       }
       
@@ -126,6 +132,7 @@ export const AuthProvider = ({ children }) => {
 
   const signIn = async (email, password) => {
     signInInProgress.current = true;
+    setLoading(true);
     
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -135,6 +142,7 @@ export const AuthProvider = ({ children }) => {
 
       if (error) {
         signInInProgress.current = false;
+        setLoading(false);
         let errorMessage = error.message;
         
         if (errorMessage.includes('body stream')) {
@@ -151,16 +159,19 @@ export const AuthProvider = ({ children }) => {
         try {
           const roles = await fetchUserRoles(data.user.id);
           setUserRoles(roles);
+          logger.debug('AuthContext', 'Roles loaded on sign in', { roles });
         } catch (err) {
-          console.error('Roles fetch error on sign in:', err);
+          logger.error('AuthContext', 'Roles fetch error on sign in', err);
         }
       }
 
       signInInProgress.current = false;
+      setLoading(false);
       return { data, error: null };
     } catch (err) {
       signInInProgress.current = false;
-      console.error('SignIn error:', err);
+      setLoading(false);
+      logger.error('AuthContext', 'SignIn error', err);
       
       const errorMessage = err.message?.includes('body stream') 
         ? 'Credenciales inválidas. Verifica tu correo y contraseña.'
@@ -177,7 +188,7 @@ export const AuthProvider = ({ children }) => {
       setUserRoles([]);
       return { error: null };
     } catch (err) {
-      console.error('SignOut error:', err);
+      logger.error('AuthContext', 'SignOut error', err);
       setUser(null);
       setUserRoles([]);
       return { error: null };
@@ -196,6 +207,7 @@ export const AuthProvider = ({ children }) => {
     user,
     userRoles,
     loading,
+    rolesLoading,
     signIn,
     signOut,
     hasRole,

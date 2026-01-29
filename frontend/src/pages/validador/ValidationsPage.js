@@ -19,6 +19,7 @@ import {
   CheckCircle, RefreshCw, Loader2, FileWarning, Eye, XCircle, FileText
 } from 'lucide-react';
 import { PROPOSAL_STATUS } from '../../lib/constants';
+import logger from '../../lib/logger';
 
 export default function ValidadorValidationsPage() {
   const { user } = useAuth();
@@ -44,7 +45,7 @@ export default function ValidadorValidationsPage() {
         .single();
 
       if (unitError && unitError.code !== 'PGRST116') {
-        console.error('Error fetching user validator unit:', unitError);
+        logger.error('ValidationsPage', 'Error fetching user validator unit', unitError);
       }
 
       let query = supabase
@@ -76,7 +77,7 @@ export default function ValidadorValidationsPage() {
       const filtered = data?.filter(v => v.proposals?.status === PROPOSAL_STATUS.IN_VALIDATION || v.proposals?.status === PROPOSAL_STATUS.SUBMITTED) || [];
       setValidations(filtered);
     } catch (err) {
-      console.error('Error fetching validations:', err);
+      logger.error('ValidationsPage', 'Error fetching validations', err);
       toast.error('Error al cargar validaciones');
     } finally {
       setLoading(false);
@@ -106,7 +107,7 @@ export default function ValidadorValidationsPage() {
         if (error) throw error;
         setCvUrl(data.signedUrl);
       } catch (err) {
-        console.error('Error getting CV URL:', err);
+        logger.error('ValidationsPage', 'Error getting CV URL', err);
         toast.error('Error al cargar el CV');
       } finally {
         setLoadingCv(false);
@@ -122,7 +123,7 @@ export default function ValidadorValidationsPage() {
       .eq('proposal_id', proposalId);
 
     if (error) {
-      console.error('Error checking validations:', error);
+      logger.error('ValidationsPage', 'Error checking validations', error);
       return;
     }
 
@@ -171,7 +172,7 @@ export default function ValidadorValidationsPage() {
       setDetailDialogOpen(false);
       fetchValidations();
     } catch (err) {
-      console.error('Error approving:', err);
+      logger.error('ValidationsPage', 'Error approving', err);
       toast.error('Error al aprobar');
     } finally {
       setProcessing(false);
@@ -212,7 +213,7 @@ export default function ValidadorValidationsPage() {
       setDetailDialogOpen(false);
       fetchValidations();
     } catch (err) {
-      console.error('Error rejecting:', err);
+      logger.error('ValidationsPage', 'Error rejecting', err);
       toast.error('Error al rechazar');
     } finally {
       setProcessing(false);

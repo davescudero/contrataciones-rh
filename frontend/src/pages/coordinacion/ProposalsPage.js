@@ -23,6 +23,7 @@ import {
   FileText, Plus, RefreshCw, Loader2, FileWarning, Upload, List
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, PROPOSAL_STATUS, PROPOSAL_STATUS_LABELS, validateCURP } from '../../lib/constants';
+import logger from '../../lib/logger';
 
 export default function CoordinacionProposalsPage() {
   const { user } = useAuth();
@@ -63,7 +64,7 @@ export default function CoordinacionProposalsPage() {
       if (error) throw error;
       setCampaigns(data || []);
     } catch (err) {
-      console.error('Error fetching campaigns:', err);
+      logger.error('ProposalsPage', 'Error fetching campaigns', err);
       toast.error('Error al cargar campañas');
     } finally {
       setLoadingCampaigns(false);
@@ -88,7 +89,7 @@ export default function CoordinacionProposalsPage() {
       if (error) throw error;
       setProposals(data || []);
     } catch (err) {
-      console.error('Error fetching proposals:', err);
+      logger.error('ProposalsPage', 'Error fetching proposals', err);
       toast.error('Error al cargar propuestas');
     } finally {
       setLoadingProposals(false);
@@ -110,7 +111,7 @@ export default function CoordinacionProposalsPage() {
       .eq('campaign_id', campaign.id);
     
     if (posError) {
-      console.error('Error fetching positions:', posError);
+      logger.error('ProposalsPage', 'Error fetching positions', posError);
       toast.error('Error al cargar posiciones');
       return;
     }
@@ -123,7 +124,7 @@ export default function CoordinacionProposalsPage() {
       .eq('campaign_id', campaign.id);
     
     if (facError) {
-      console.error('Error fetching facilities:', facError);
+      logger.error('ProposalsPage', 'Error fetching facilities', facError);
       toast.error('Error al cargar CLUES');
       return;
     }
@@ -258,7 +259,7 @@ export default function CoordinacionProposalsPage() {
       fetchProposals();
       setActiveTab('proposals');
     } catch (err) {
-      console.error('Error submitting proposal:', err);
+      logger.error('ProposalsPage', 'Error submitting proposal', err);
       toast.error('Error al enviar propuesta: ' + (err.message || 'Error desconocido'));
     } finally {
       setSubmitting(false);

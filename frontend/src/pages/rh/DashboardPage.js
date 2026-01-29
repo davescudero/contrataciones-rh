@@ -8,6 +8,7 @@ import {
   BarChart3, RefreshCw, Megaphone, FileText, CheckCircle, Download
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, PROPOSAL_STATUS } from '../../lib/constants';
+import logger from '../../lib/logger';
 
 export default function RHDashboardPage() {
   const [stats, setStats] = useState(null);
@@ -45,7 +46,7 @@ export default function RHDashboardPage() {
         rejectedProposals,
       });
     } catch (err) {
-      console.error('Error fetching stats:', err);
+      logger.error('RHDashboard', 'Error fetching stats', err);
       toast.error('Error al cargar estadísticas');
     } finally {
       setLoading(false);
@@ -101,7 +102,7 @@ export default function RHDashboardPage() {
 
       toast.success('Exportación completada');
     } catch (err) {
-      console.error('Error exporting:', err);
+      logger.error('RHDashboard', 'Error exporting', err);
       toast.error('Error al exportar');
     } finally {
       setExporting(false);
