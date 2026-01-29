@@ -160,12 +160,16 @@ Este documento presenta un plan estructurado de mejoras para el Sistema de Reclu
 ### Mejoras Realizadas (28 Enero 2026)
 - ✅ Sistema de logging centralizado (`src/lib/logger.js`)
 - ✅ Custom hook para manejo de errores (`src/hooks/useErrorHandler.js`)
-- ✅ Tests unitarios básicos implementados
+- ✅ Tests unitarios básicos implementados (5 suites, 33 tests)
 - ✅ Limpieza de archivos innecesarios del proyecto
-- ✅ README principal actualizado
+- ✅ README principal actualizado con documentación completa
 - ✅ Eliminado panel de DEBUG de la página principal
 - ✅ Fix error 409 al asignar validadores duplicados
 - ✅ Agregado DialogDescription para accesibilidad
+- ✅ Fix error 404 de tabla `user_validator_units` (manejo gracioso)
+- ✅ Reemplazo de 42 console.error por logger centralizado
+- ✅ Fix bug de roles en login (rolesLoading state)
+- ✅ Eliminación de archivos obsoletos (test_reports/, tests/, yarn.lock duplicados)
 
 ### Dependencias a Actualizar
 - Revisar compatibilidad de React 19 con dependencias actuales
