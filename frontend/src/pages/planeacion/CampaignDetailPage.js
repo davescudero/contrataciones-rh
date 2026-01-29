@@ -12,7 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '../../components/ui/table';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from '../../components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -373,6 +373,20 @@ export default function CampaignDetailPage() {
       
       for (const unitId of selectedValidatorUnits) {
         try {
+          // Check if validator already exists
+          const { data: existing } = await supabase
+            .from('campaign_validators')
+            .select('id')
+            .eq('campaign_id', id)
+            .eq('position_id', positionId)
+            .eq('validator_unit_id', unitId)
+            .maybeSingle();
+          
+          if (existing) {
+            // Already exists, skip
+            continue;
+          }
+          
           const { error } = await supabase
             .from('campaign_validators')
             .insert({
@@ -533,6 +547,7 @@ export default function CampaignDetailPage() {
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Agregar posición</DialogTitle>
+                      <DialogDescription>Selecciona una posición y define las plazas autorizadas</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
@@ -689,6 +704,7 @@ export default function CampaignDetailPage() {
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Asignar validadores</DialogTitle>
+                      <DialogDescription>Selecciona las unidades que validarán esta posición</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
