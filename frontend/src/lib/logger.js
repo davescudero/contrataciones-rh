@@ -7,6 +7,8 @@
  * Future: Can be extended to send logs to external services like Sentry, LogRocket, etc.
  */
 
+/* eslint-disable no-console */
+
 const isDev = process.env.NODE_ENV === 'development';
 const isLoggingEnabled = isDev || process.env.REACT_APP_ENABLE_LOGGING === 'true';
 
