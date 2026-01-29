@@ -37,15 +37,22 @@ export default function ValidadorValidationsPage() {
     if (!user) return;
     setLoading(true);
     try {
-      // First get the validator unit for this user
-      const { data: userValidatorUnit, error: unitError } = await supabase
-        .from('user_validator_units')
-        .select('validator_unit_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (unitError && unitError.code !== 'PGRST116') {
-        logger.error('ValidationsPage', 'Error fetching user validator unit', unitError);
+      // Try to get the validator unit for this user (table may not exist yet)
+      let userValidatorUnit = null;
+      try {
+        const { data, error } = await supabase
+          .from('user_validator_units')
+          .select('validator_unit_id')
+          .eq('user_id', user.id)
+          .single();
+        
+        // Only log unexpected errors (not 404/table doesn't exist or PGRST116/no rows)
+        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && !error.message?.includes('404')) {
+          logger.error('ValidationsPage', 'Error fetching user validator unit', error);
+        }
+        userValidatorUnit = data;
+      } catch {
+        // Table doesn't exist or other error - continue without filter
       }
 
       let query = supabase
