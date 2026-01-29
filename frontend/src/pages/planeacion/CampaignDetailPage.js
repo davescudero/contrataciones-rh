@@ -5,7 +5,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
@@ -13,7 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '../../components/ui/table';
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from '../../components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -31,7 +30,7 @@ import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABELS, ROLES } from '../../lib/consta
 export default function CampaignDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasRole, user } = useAuth();
+  const { hasRole } = useAuth();
   
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);

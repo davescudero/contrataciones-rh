@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Card, CardContent } from '../../components/ui/card';
 import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { 
-  BarChart3, RefreshCw, Megaphone, FileText, CheckCircle, Users, Download
+  BarChart3, RefreshCw, Megaphone, FileText, CheckCircle, Download
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, PROPOSAL_STATUS } from '../../lib/constants';
 

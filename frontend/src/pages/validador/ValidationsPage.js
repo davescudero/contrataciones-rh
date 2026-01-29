@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Card, CardContent } from '../../components/ui/card';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { 
@@ -18,7 +18,7 @@ import { es } from 'date-fns/locale';
 import { 
   CheckCircle, RefreshCw, Loader2, FileWarning, Eye, XCircle, FileText
 } from 'lucide-react';
-import { PROPOSAL_STATUS, VALIDATION_STATUS } from '../../lib/constants';
+import { PROPOSAL_STATUS } from '../../lib/constants';
 
 export default function ValidadorValidationsPage() {
   const { user } = useAuth();

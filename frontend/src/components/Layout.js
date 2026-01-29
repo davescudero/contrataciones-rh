@@ -84,13 +84,11 @@ export const Layout = ({ children }) => {
   const visibleNavItems = NAV_ITEMS.filter(item => hasAnyRole(item.roles));
 
   const handleSignOut = async () => {
-    console.log('=== DEBUG: handleSignOut called');
     try {
       await signOut();
-      console.log('=== DEBUG: signOut completed');
       navigate('/login');
     } catch (err) {
-      console.error('=== DEBUG: signOut error:', err);
+      // Error handled silently - user will be redirected anyway
     }
   };
 

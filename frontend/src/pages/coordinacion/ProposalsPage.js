@@ -5,24 +5,22 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '../../components/ui/table';
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '../../components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
-import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
-  FileText, Plus, RefreshCw, Loader2, FileWarning, Upload, AlertCircle, Eye, List
+  FileText, Plus, RefreshCw, Loader2, FileWarning, Upload, List
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, PROPOSAL_STATUS, PROPOSAL_STATUS_LABELS, validateCURP } from '../../lib/constants';
 
