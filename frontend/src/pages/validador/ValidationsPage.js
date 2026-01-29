@@ -46,8 +46,18 @@ export default function ValidadorValidationsPage() {
           .eq('user_id', user.id)
           .single();
         
-        // Only log unexpected errors (not 404/table doesn't exist or PGRST116/no rows)
-        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && !error.message?.includes('404')) {
+        // Only log unexpected errors (not 404/table doesn't exist, PGRST116/no rows, or 42P01/relation doesn't exist)
+        const isExpectedError = error && (
+          error.code === 'PGRST116' || // No rows found
+          error.code === '42P01' ||    // Relation doesn't exist
+          error.code === 'PGRST204' || // No content
+          error.message?.includes('404') ||
+          error.message?.includes('relation') ||
+          error.details?.includes('404') ||
+          error.hint?.includes('404')
+        );
+        
+        if (error && !isExpectedError) {
           logger.error('ValidationsPage', 'Error fetching user validator unit', error);
         }
         userValidatorUnit = data;
