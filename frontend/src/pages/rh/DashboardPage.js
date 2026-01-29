@@ -2,13 +2,47 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
-import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { 
-  BarChart3, RefreshCw, Megaphone, FileText, CheckCircle, Download
+  BarChart3, RefreshCw, Megaphone, FileText, CheckCircle, Download, XCircle, Clock
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, PROPOSAL_STATUS } from '../../lib/constants';
 import logger from '../../lib/logger';
+
+// New components
+import { PageHeader } from '../../components/ui/breadcrumbs';
+import { StatCardSkeleton } from '../../components/ui/skeletons';
+
+/**
+ * Stat Card component for dashboard
+ */
+function StatCard({ icon: Icon, value, label, color = 'slate' }) {
+  const colorClasses = {
+    slate: { bg: 'bg-slate-100', text: 'text-slate-600', value: 'text-slate-900' },
+    green: { bg: 'bg-green-100', text: 'text-green-600', value: 'text-green-600' },
+    amber: { bg: 'bg-amber-100', text: 'text-amber-600', value: 'text-amber-600' },
+    red: { bg: 'bg-red-100', text: 'text-red-600', value: 'text-red-600' },
+    blue: { bg: 'bg-blue-100', text: 'text-blue-600', value: 'text-blue-600' },
+  };
+  
+  const colors = colorClasses[color] || colorClasses.slate;
+  
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-6">
+        <div className="flex items-center gap-4">
+          <div className={`w-12 h-12 ${colors.bg} rounded-lg flex items-center justify-center`}>
+            <Icon className={`w-6 h-6 ${colors.text}`} />
+          </div>
+          <div>
+            <p className={`text-3xl font-bold ${colors.value}`}>{value}</p>
+            <p className="text-sm text-slate-500">{label}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function RHDashboardPage() {
   const [stats, setStats] = useState(null);
@@ -112,130 +146,109 @@ export default function RHDashboardPage() {
   return (
     <div className="space-y-6" data-testid="rh-dashboard-page">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-            <BarChart3 className="w-5 h-5 text-slate-600" strokeWidth={1.5} />
+      <PageHeader
+        icon={BarChart3}
+        title="Dashboard RH"
+        description="Indicadores y reportes de reclutamiento"
+        breadcrumbs={[
+          { label: 'RH' },
+          { label: 'Dashboard' },
+        ]}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={fetchStats} disabled={loading}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Actualizar
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
+              <Download className={`w-4 h-4 mr-2 ${exporting ? 'animate-spin' : ''}`} />
+              Exportar CSV
+            </Button>
           </div>
-          <div>
-            <h1 className="font-heading text-2xl font-bold text-slate-900">Dashboard RH</h1>
-            <p className="font-body text-sm text-slate-500">
-              Indicadores y reportes de reclutamiento
-            </p>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchStats} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Actualizar
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
-            <Download className={`w-4 h-4 mr-2 ${exporting ? 'animate-spin' : ''}`} />
-            Exportar CSV
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Stats Grid */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <Skeleton className="h-8 w-16 mb-2" />
-                <Skeleton className="h-4 w-24" />
-              </CardContent>
-            </Card>
+            <StatCardSkeleton key={i} />
           ))}
         </div>
       ) : (
         <>
           {/* Campaigns Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
-                    <Megaphone className="w-6 h-6 text-slate-600" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold text-slate-900">{stats?.totalCampaigns || 0}</p>
-                    <p className="text-sm text-slate-500">Total campañas</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <Megaphone className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold text-green-600">{stats?.activeCampaigns || 0}</p>
-                    <p className="text-sm text-slate-500">Campañas activas</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              icon={Megaphone}
+              value={stats?.totalCampaigns || 0}
+              label="Total campañas"
+              color="slate"
+            />
+            <StatCard
+              icon={Megaphone}
+              value={stats?.activeCampaigns || 0}
+              label="Campañas activas"
+              color="green"
+            />
           </div>
 
           {/* Proposals Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-slate-600" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold text-slate-900">{stats?.totalProposals || 0}</p>
-                    <p className="text-sm text-slate-500">Total propuestas</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold text-amber-600">{stats?.inValidationProposals || 0}</p>
-                    <p className="text-sm text-slate-500">En validación</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold text-green-600">{stats?.approvedProposals || 0}</p>
-                    <p className="text-sm text-slate-500">Aprobadas</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold text-red-600">{stats?.rejectedProposals || 0}</p>
-                    <p className="text-sm text-slate-500">Rechazadas</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              icon={FileText}
+              value={stats?.totalProposals || 0}
+              label="Total propuestas"
+              color="slate"
+            />
+            <StatCard
+              icon={Clock}
+              value={stats?.inValidationProposals || 0}
+              label="En validación"
+              color="amber"
+            />
+            <StatCard
+              icon={CheckCircle}
+              value={stats?.approvedProposals || 0}
+              label="Aprobadas"
+              color="green"
+            />
+            <StatCard
+              icon={XCircle}
+              value={stats?.rejectedProposals || 0}
+              label="Rechazadas"
+              color="red"
+            />
           </div>
+
+          {/* Stats summary */}
+          {stats && stats.totalProposals > 0 && (
+            <Card className="bg-slate-50">
+              <CardContent className="p-6">
+                <h3 className="text-sm font-medium text-slate-700 mb-4">Resumen de propuestas</h3>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-2xl font-bold text-green-600">
+                      {Math.round((stats.approvedProposals / stats.totalProposals) * 100)}%
+                    </p>
+                    <p className="text-xs text-slate-500">Tasa de aprobación</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-amber-600">
+                      {Math.round((stats.inValidationProposals / stats.totalProposals) * 100)}%
+                    </p>
+                    <p className="text-xs text-slate-500">En proceso</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-red-600">
+                      {Math.round((stats.rejectedProposals / stats.totalProposals) * 100)}%
+                    </p>
+                    <p className="text-xs text-slate-500">Tasa de rechazo</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

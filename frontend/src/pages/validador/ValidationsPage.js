@@ -11,15 +11,24 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '../../components/ui/dialog';
-import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
-  CheckCircle, RefreshCw, Loader2, FileWarning, Eye, XCircle, FileText
+  CheckCircle, RefreshCw, Loader2, Eye, XCircle, FileText
 } from 'lucide-react';
 import { PROPOSAL_STATUS } from '../../lib/constants';
 import logger from '../../lib/logger';
+
+// New components
+import { PageHeader } from '../../components/ui/breadcrumbs';
+import { EmptyState } from '../../components/ui/empty-state';
+import { TableSkeleton } from '../../components/ui/skeletons';
+import { ProposalStatusBadge } from '../../components/ui/status-badge';
+import { SearchInput, useSearch } from '../../components/ui/search-input';
+import { DataTablePagination } from '../../components/ui/data-table-pagination';
+
+const PAGE_SIZE = 10;
 
 export default function ValidadorValidationsPage() {
   const { user } = useAuth();
@@ -32,6 +41,8 @@ export default function ValidadorValidationsPage() {
   const [processing, setProcessing] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
   const fetchValidations = useCallback(async () => {
     if (!user) return;
@@ -246,63 +257,104 @@ export default function ValidadorValidationsPage() {
     }
   };
 
+  // Search functionality
+  const { query, setQuery, filteredData } = useSearch({
+    data: validations || [],
+    searchFields: ['proposals.curp', 'proposals.campaigns.name'],
+    customFilter: (item, searchQuery) => {
+      const q = searchQuery.toLowerCase();
+      return (
+        item.proposals?.curp?.toLowerCase().includes(q) ||
+        item.proposals?.campaigns?.name?.toLowerCase().includes(q) ||
+        item.proposals?.health_facilities?.clues?.toLowerCase().includes(q) ||
+        item.proposals?.health_facilities?.name?.toLowerCase().includes(q)
+      );
+    }
+  });
+
+  // Pagination
+  const paginatedData = filteredData.slice(page * pageSize, (page + 1) * pageSize);
+  const totalPages = Math.ceil(filteredData.length / pageSize);
+
+  // Reset page on search
+  const handleSearchChange = useCallback((value) => {
+    setQuery(value);
+    setPage(0);
+  }, [setQuery]);
+
   return (
     <div className="space-y-6" data-testid="validador-validations-page">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-            <CheckCircle className="w-5 h-5 text-slate-600" strokeWidth={1.5} />
-          </div>
-          <div>
-            <h1 className="font-heading text-2xl font-bold text-slate-900">Validaciones</h1>
-            <p className="font-body text-sm text-slate-500">
-              Propuestas pendientes de validación
-            </p>
-          </div>
-        </div>
+      <PageHeader
+        icon={CheckCircle}
+        title="Validaciones"
+        description="Propuestas pendientes de validación"
+        breadcrumbs={[
+          { label: 'Validador' },
+          { label: 'Validaciones' },
+        ]}
+        actions={
+          <Button variant="outline" size="sm" onClick={fetchValidations} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+        }
+      />
 
-        <Button variant="outline" size="sm" onClick={fetchValidations} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+      {/* Search */}
+      <div className="flex items-center gap-4">
+        <SearchInput
+          value={query}
+          onChange={handleSearchChange}
+          placeholder="Buscar por CURP, campaña o CLUES..."
+          className="max-w-sm"
+        />
+        <div className="text-sm text-slate-500">
+          {filteredData.length} validación{filteredData.length !== 1 ? 'es' : ''} pendiente{filteredData.length !== 1 ? 's' : ''}
+        </div>
       </div>
 
       {/* Table */}
       <Card className="border-slate-200 shadow-sm">
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-6 space-y-4">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : validations.length === 0 ? (
-            <div className="p-12 text-center" data-testid="no-validations">
-              <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                <FileWarning className="w-6 h-6 text-slate-400" />
-              </div>
-              <p className="font-body text-slate-500">No hay propuestas pendientes de validación</p>
-            </div>
+            <TableSkeleton rows={5} columns={6} />
+          ) : filteredData.length === 0 ? (
+            <EmptyState
+              iconPreset={query ? 'search' : 'validations'}
+              title={query ? 'Sin resultados' : 'No hay validaciones pendientes'}
+              description={
+                query
+                  ? `No se encontraron validaciones para "${query}"`
+                  : 'Todas las propuestas han sido validadas'
+              }
+              secondaryActionLabel={query ? 'Limpiar búsqueda' : undefined}
+              onSecondaryAction={query ? () => setQuery('') : undefined}
+            />
           ) : (
-            <Table>
+            <>
+              <Table>
               <TableHeader>
                 <TableRow className="bg-slate-50 hover:bg-slate-50">
                   <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">CURP</TableHead>
                   <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">Campaña</TableHead>
                   <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">Posición</TableHead>
                   <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">CLUES</TableHead>
+                  <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">Estado</TableHead>
                   <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">Fecha</TableHead>
                   <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {validations.map((validation) => (
+                {paginatedData.map((validation) => (
                   <TableRow key={validation.id} className="hover:bg-slate-50/50">
                     <TableCell className="font-mono text-sm">{validation.proposals?.curp || '-'}</TableCell>
                     <TableCell>{validation.proposals?.campaigns?.name || '-'}</TableCell>
                     <TableCell>{validation.proposals?.campaign_positions?.positions_catalog?.name || '-'}</TableCell>
                     <TableCell className="font-mono text-sm">{validation.proposals?.health_facilities?.clues || '-'}</TableCell>
+                    <TableCell>
+                      <ProposalStatusBadge status={validation.proposals?.status} showIcon />
+                    </TableCell>
                     <TableCell className="text-slate-500 text-sm">{formatDate(validation.created_at)}</TableCell>
                     <TableCell>
                       <Button 
@@ -318,6 +370,17 @@ export default function ValidadorValidationsPage() {
                 ))}
               </TableBody>
             </Table>
+            {totalPages > 1 && (
+              <DataTablePagination
+                page={page}
+                pageSize={pageSize}
+                totalCount={filteredData.length}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            )}
+            </>
           )}
         </CardContent>
       </Card>

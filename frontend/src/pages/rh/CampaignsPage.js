@@ -1,89 +1,108 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '../../components/ui/table';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
-} from '../../components/ui/alert-dialog';
-import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { 
-  Megaphone, RefreshCw, Play, Pause, Loader2, FileWarning
-} from 'lucide-react';
-import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABELS } from '../../lib/constants';
+import { Megaphone, RefreshCw, Play, Pause, Loader2 } from 'lucide-react';
+import { CAMPAIGN_STATUS } from '../../lib/constants';
+
+// New components
+import { useSupabaseQuery } from '../../hooks/useSupabaseQuery';
+import { PageHeader } from '../../components/ui/breadcrumbs';
+import { EmptyState } from '../../components/ui/empty-state';
+import { TableSkeleton } from '../../components/ui/skeletons';
+import { CampaignStatusBadge } from '../../components/ui/status-badge';
+import { ConfirmDialog, useConfirmDialog } from '../../components/ui/confirm-dialog';
+import { SearchInput, useSearch } from '../../components/ui/search-input';
+import { DataTablePagination } from '../../components/ui/data-table-pagination';
 import logger from '../../lib/logger';
 
+const PAGE_SIZE = 10;
+
 export default function RHCampaignsPage() {
-  const [campaigns, setCampaigns] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
-  const fetchCampaigns = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('campaigns')
-        .select('*')
-        .in('status', [CAMPAIGN_STATUS.APPROVED, CAMPAIGN_STATUS.ACTIVE, CAMPAIGN_STATUS.INACTIVE])
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCampaigns(data || []);
-    } catch (err) {
-      logger.error('RHCampaigns', 'Error fetching campaigns', err);
-      toast.error('Error al cargar las campañas');
-    } finally {
-      setLoading(false);
+  // Fetch campaigns with new hook
+  const { data: campaigns, loading, refetch, error } = useSupabaseQuery(
+    () => supabase
+      .from('campaigns')
+      .select('*')
+      .in('status', [CAMPAIGN_STATUS.APPROVED, CAMPAIGN_STATUS.ACTIVE, CAMPAIGN_STATUS.INACTIVE])
+      .order('created_at', { ascending: false }),
+    { 
+      context: 'RHCampaigns',
+      initialData: [],
     }
-  };
+  );
 
-  useEffect(() => {
-    fetchCampaigns();
-  }, []);
+  // Search functionality
+  const { query, setQuery, filteredData } = useSearch({
+    data: campaigns || [],
+    searchFields: ['name', 'description'],
+  });
 
-  const handleActivate = async (campaignId) => {
-    setProcessing(campaignId);
-    try {
-      const { error } = await supabase
-        .from('campaigns')
-        .update({ status: CAMPAIGN_STATUS.ACTIVE })
-        .eq('id', campaignId);
+  // Paginate filtered data
+  const paginatedData = filteredData.slice(page * pageSize, (page + 1) * pageSize);
+  const totalPages = Math.ceil(filteredData.length / pageSize);
 
-      if (error) throw error;
-      toast.success('Campaña activada exitosamente');
-      fetchCampaigns();
-    } catch (err) {
-      logger.error('RHCampaigns', 'Error activating campaign', err);
-      toast.error('Error al activar la campaña');
-    } finally {
-      setProcessing(null);
-    }
-  };
+  // Confirm dialog for activate
+  const activateDialog = useConfirmDialog({
+    title: 'Activar campaña',
+    description: 'Una vez activa, la campaña será visible para las coordinaciones estatales.',
+    confirmLabel: 'Activar',
+    variant: 'success',
+    onConfirm: async (campaign) => {
+      setProcessing(campaign.id);
+      try {
+        const { error } = await supabase
+          .from('campaigns')
+          .update({ status: CAMPAIGN_STATUS.ACTIVE })
+          .eq('id', campaign.id);
 
-  const handleDeactivate = async (campaignId) => {
-    setProcessing(campaignId);
-    try {
-      const { error } = await supabase
-        .from('campaigns')
-        .update({ status: CAMPAIGN_STATUS.INACTIVE })
-        .eq('id', campaignId);
+        if (error) throw error;
+        toast.success('Campaña activada exitosamente');
+        refetch();
+      } catch (err) {
+        logger.error('RHCampaigns', 'Error activating campaign', err);
+        toast.error('Error al activar la campaña');
+      } finally {
+        setProcessing(null);
+      }
+    },
+  });
 
-      if (error) throw error;
-      toast.success('Campaña desactivada');
-      fetchCampaigns();
-    } catch (err) {
-      logger.error('RHCampaigns', 'Error deactivating campaign', err);
-      toast.error('Error al desactivar la campaña');
-    } finally {
-      setProcessing(null);
-    }
-  };
+  // Confirm dialog for deactivate
+  const deactivateDialog = useConfirmDialog({
+    title: 'Desactivar campaña',
+    description: 'Las coordinaciones estatales ya no podrán crear propuestas para esta campaña.',
+    confirmLabel: 'Desactivar',
+    variant: 'warning',
+    onConfirm: async (campaign) => {
+      setProcessing(campaign.id);
+      try {
+        const { error } = await supabase
+          .from('campaigns')
+          .update({ status: CAMPAIGN_STATUS.INACTIVE })
+          .eq('id', campaign.id);
+
+        if (error) throw error;
+        toast.success('Campaña desactivada');
+        refetch();
+      } catch (err) {
+        logger.error('RHCampaigns', 'Error deactivating campaign', err);
+        toast.error('Error al desactivar la campaña');
+      } finally {
+        setProcessing(null);
+      }
+    },
+  });
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
@@ -94,151 +113,177 @@ export default function RHCampaignsPage() {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const config = CAMPAIGN_STATUS_LABELS[status] || { label: status, color: 'bg-slate-100 text-slate-700' };
-    return <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>{config.label}</span>;
-  };
+  // Reset page when search changes
+  const handleSearchChange = useCallback((value) => {
+    setQuery(value);
+    setPage(0);
+  }, [setQuery]);
 
   return (
     <div className="space-y-6" data-testid="rh-campaigns-page">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-            <Megaphone className="w-5 h-5 text-slate-600" strokeWidth={1.5} />
-          </div>
-          <div>
-            <h1 className="font-heading text-2xl font-bold text-slate-900">Activación de Campañas</h1>
-            <p className="font-body text-sm text-slate-500">
-              Activar y desactivar campañas aprobadas
-            </p>
-          </div>
-        </div>
+      {/* Header with breadcrumbs */}
+      <PageHeader
+        icon={Megaphone}
+        title="Activación de Campañas"
+        description="Activar y desactivar campañas aprobadas"
+        breadcrumbs={[
+          { label: 'RH', href: '/rh/dashboard' },
+          { label: 'Campañas' },
+        ]}
+        actions={
+          <Button variant="outline" size="sm" onClick={refetch} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+        }
+      />
 
-        <Button variant="outline" size="sm" onClick={fetchCampaigns} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+      {/* Search */}
+      <div className="flex items-center gap-4">
+        <SearchInput
+          value={query}
+          onChange={handleSearchChange}
+          placeholder="Buscar campañas..."
+          className="max-w-sm"
+        />
+        <div className="text-sm text-slate-500">
+          {filteredData.length} campaña{filteredData.length !== 1 ? 's' : ''}
+        </div>
       </div>
 
       {/* Table */}
       <Card className="border-slate-200 shadow-sm">
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-6 space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex gap-4">
-                  <Skeleton className="h-8 w-48" />
-                  <Skeleton className="h-8 w-32" />
-                  <Skeleton className="h-8 w-24" />
-                </div>
-              ))}
-            </div>
-          ) : campaigns.length === 0 ? (
-            <div className="p-12 text-center" data-testid="no-campaigns">
-              <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                <FileWarning className="w-6 h-6 text-slate-400" />
-              </div>
-              <p className="font-body text-slate-500">No hay campañas disponibles</p>
-            </div>
+            <TableSkeleton rows={5} columns={4} />
+          ) : error ? (
+            <EmptyState
+              iconPreset="error"
+              title="Error al cargar"
+              description="No se pudieron cargar las campañas"
+              secondaryActionLabel="Reintentar"
+              onSecondaryAction={refetch}
+            />
+          ) : filteredData.length === 0 ? (
+            <EmptyState
+              iconPreset="campaigns"
+              title={query ? 'Sin resultados' : 'No hay campañas'}
+              description={
+                query 
+                  ? `No se encontraron campañas para "${query}"`
+                  : 'No hay campañas disponibles para activar'
+              }
+              secondaryActionLabel={query ? 'Limpiar búsqueda' : undefined}
+              onSecondaryAction={query ? () => setQuery('') : undefined}
+            />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-50 hover:bg-slate-50">
-                  <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">Nombre</TableHead>
-                  <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">Estado</TableHead>
-                  <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">Última actualización</TableHead>
-                  <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {campaigns.map((campaign) => (
-                  <TableRow key={campaign.id} className="hover:bg-slate-50/50">
-                    <TableCell className="font-medium text-slate-900">{campaign.name}</TableCell>
-                    <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-                    <TableCell className="text-slate-600">{formatDate(campaign.updated_at)}</TableCell>
-                    <TableCell>
-                      {campaign.status === CAMPAIGN_STATUS.APPROVED && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="text-green-600 hover:text-green-700"
-                              disabled={processing === campaign.id}
-                            >
-                              {processing === campaign.id ? (
-                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                              ) : (
-                                <Play className="w-4 h-4 mr-1" />
-                              )}
-                              Activar
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Activar campaña</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                ¿Estás seguro de activar la campaña "{campaign.name}"? 
-                                Una vez activa, la campaña será visible para las coordinaciones estatales.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleActivate(campaign.id)}>
-                                Activar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-
-                      {campaign.status === CAMPAIGN_STATUS.ACTIVE && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="text-amber-600 hover:text-amber-700"
-                              disabled={processing === campaign.id}
-                            >
-                              {processing === campaign.id ? (
-                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                              ) : (
-                                <Pause className="w-4 h-4 mr-1" />
-                              )}
-                              Desactivar
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Desactivar campaña</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                ¿Estás seguro de desactivar la campaña "{campaign.name}"? 
-                                Las coordinaciones estatales ya no podrán crear propuestas.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeactivate(campaign.id)}>
-                                Desactivar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-
-                      {campaign.status === CAMPAIGN_STATUS.INACTIVE && (
-                        <span className="text-sm text-slate-400">Sin acciones disponibles</span>
-                      )}
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50 hover:bg-slate-50">
+                    <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">
+                      Nombre
+                    </TableHead>
+                    <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">
+                      Estado
+                    </TableHead>
+                    <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">
+                      Última actualización
+                    </TableHead>
+                    <TableHead className="font-medium text-xs uppercase tracking-wider text-slate-700">
+                      Acciones
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedData.map((campaign) => (
+                    <TableRow key={campaign.id} className="hover:bg-slate-50/50">
+                      <TableCell className="font-medium text-slate-900">
+                        {campaign.name}
+                      </TableCell>
+                      <TableCell>
+                        <CampaignStatusBadge status={campaign.status} showIcon />
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        {formatDate(campaign.updated_at)}
+                      </TableCell>
+                      <TableCell>
+                        {campaign.status === CAMPAIGN_STATUS.APPROVED && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            disabled={processing === campaign.id}
+                            onClick={() => activateDialog.confirm(campaign)}
+                          >
+                            {processing === campaign.id ? (
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            ) : (
+                              <Play className="w-4 h-4 mr-1" />
+                            )}
+                            Activar
+                          </Button>
+                        )}
+
+                        {campaign.status === CAMPAIGN_STATUS.ACTIVE && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                            disabled={processing === campaign.id}
+                            onClick={() => deactivateDialog.confirm(campaign)}
+                          >
+                            {processing === campaign.id ? (
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            ) : (
+                              <Pause className="w-4 h-4 mr-1" />
+                            )}
+                            Desactivar
+                          </Button>
+                        )}
+
+                        {campaign.status === CAMPAIGN_STATUS.INACTIVE && (
+                          <span className="text-sm text-slate-400">Sin acciones</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <DataTablePagination
+                  page={page}
+                  pageSize={pageSize}
+                  totalCount={filteredData.length}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                  onPageSizeChange={setPageSize}
+                />
+              )}
+            </>
           )}
         </CardContent>
       </Card>
+
+      {/* Confirm Dialogs */}
+      <ConfirmDialog 
+        {...activateDialog.dialogProps}
+        description={
+          activateDialog.pendingData 
+            ? `¿Estás seguro de activar la campaña "${activateDialog.pendingData.name}"? Una vez activa, será visible para las coordinaciones estatales.`
+            : activateDialog.dialogProps.description
+        }
+      />
+      <ConfirmDialog 
+        {...deactivateDialog.dialogProps}
+        description={
+          deactivateDialog.pendingData 
+            ? `¿Estás seguro de desactivar la campaña "${deactivateDialog.pendingData.name}"? Las coordinaciones estatales ya no podrán crear propuestas.`
+            : deactivateDialog.dialogProps.description
+        }
+      />
     </div>
   );
 }

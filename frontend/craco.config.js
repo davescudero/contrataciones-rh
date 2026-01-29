@@ -103,4 +103,13 @@ webpackConfig.devServer = (devServerConfig) => {
   return devServerConfig;
 };
 
+// Jest configuration - add module name mapper for @ alias
+webpackConfig.jest = {
+  configure: {
+    moduleNameMapper: {
+      '^@/(.*)$': '<rootDir>/src/$1',
+    },
+  },
+};
+
 module.exports = webpackConfig;

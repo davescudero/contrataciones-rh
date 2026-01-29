@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { 
-  BarChart3, RefreshCw, Megaphone, FileText, CheckCircle, Clock, XCircle
+  BarChart3, RefreshCw, Megaphone, FileText, CheckCircle, Clock, XCircle, TrendingUp
 } from 'lucide-react';
 import { CAMPAIGN_STATUS, PROPOSAL_STATUS } from '../../lib/constants';
 import logger from '../../lib/logger';
+
+// New components
+import { PageHeader } from '../../components/ui/breadcrumbs';
+import { StatCardSkeleton, CardSkeleton } from '../../components/ui/skeletons';
 
 export default function DGDashboardPage() {
   const [stats, setStats] = useState(null);
@@ -65,40 +68,33 @@ export default function DGDashboardPage() {
   return (
     <div className="space-y-6" data-testid="dg-dashboard-page">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-            <BarChart3 className="w-5 h-5 text-slate-600" strokeWidth={1.5} />
-          </div>
-          <div>
-            <h1 className="font-heading text-2xl font-bold text-slate-900">Dashboard Ejecutivo</h1>
-            <p className="font-body text-sm text-slate-500">
-              Vista general del proceso de reclutamiento
-            </p>
-          </div>
-        </div>
-
-        <Button variant="outline" size="sm" onClick={fetchStats} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
-      </div>
+      <PageHeader
+        icon={BarChart3}
+        title="Dashboard Ejecutivo"
+        description="Vista general del proceso de reclutamiento"
+        breadcrumbs={[
+          { label: 'Dirección General' },
+          { label: 'Dashboard' },
+        ]}
+        actions={
+          <Button variant="outline" size="sm" onClick={fetchStats} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+        }
+      />
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[1, 2].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <Skeleton className="h-8 w-32 mb-4" />
-                <div className="space-y-2">
-                  <Skeleton className="h-6 w-full" />
-                  <Skeleton className="h-6 w-full" />
-                  <Skeleton className="h-6 w-full" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CardSkeleton lines={5} />
+            <CardSkeleton lines={4} />
+          </div>
+        </>
       ) : (
         <>
           {/* Summary Cards */}
@@ -205,6 +201,46 @@ export default function DGDashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* KPI Summary */}
+          {stats && stats.totalProposals > 0 && (
+            <Card className="bg-gradient-to-r from-slate-50 to-slate-100">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Indicadores clave
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+                    <p className="text-3xl font-bold text-green-600">
+                      {stats.campaignsByStatus?.active || 0}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">Campañas activas</p>
+                  </div>
+                  <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+                    <p className="text-3xl font-bold text-blue-600">
+                      {Math.round((stats.proposalsByStatus?.approved / stats.totalProposals) * 100) || 0}%
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">Tasa aprobación</p>
+                  </div>
+                  <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+                    <p className="text-3xl font-bold text-amber-600">
+                      {stats.proposalsByStatus?.inValidation || 0}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">En proceso</p>
+                  </div>
+                  <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+                    <p className="text-3xl font-bold text-slate-700">
+                      {stats.totalProposals || 0}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">Total propuestas</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

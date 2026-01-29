@@ -97,6 +97,23 @@ SUBMITTED → IN_VALIDATION → APPROVED / REJECTED
 - proposal_validations
 - files
 
+## Mejoras Implementadas (29/01/2026)
+
+### Infraestructura y UX
+- ✅ **ErrorBoundary** - Captura errores de React y muestra UI amigable
+- ✅ **useSupabaseQuery** - Hook para queries con loading, error, y refetch
+- ✅ **useSupabaseMutation** - Hook para mutaciones con manejo de estado
+- ✅ **usePaginatedQuery** - Hook para queries paginadas
+- ✅ **EmptyState** - Componente para estados vacíos con presets
+- ✅ **ConfirmDialog** - Diálogos de confirmación para acciones destructivas
+- ✅ **DataTablePagination** - Paginación reutilizable para tablas
+- ✅ **Skeletons mejorados** - TableSkeleton, CardSkeleton, PageSkeleton, etc.
+- ✅ **Breadcrumbs** - Navegación contextual con auto-generación
+- ✅ **PageHeader** - Header de página con breadcrumbs y acciones
+- ✅ **SearchInput** - Búsqueda con debounce
+- ✅ **SearchBar** - Búsqueda con filtros
+- ✅ **useSearch** - Hook para filtrado de datos en cliente
+
 ## Backlog
 
 ### P0 (Bloqueante)
@@ -104,13 +121,13 @@ SUBMITTED → IN_VALIDATION → APPROVED / REJECTED
 
 ### P1 (Alta prioridad)
 - Filtro de CLUES por estado del usuario en COORD_ESTATAL
-- Paginación en tablas
+- ✅ ~~Paginación en tablas~~ (Componentes creados, falta integrar)
 - Edición de propuestas antes de validación
 
 ### P2 (Media prioridad)
 - Notificaciones por email
 - Historial de cambios
-- Búsqueda en tablas
+- ✅ ~~Búsqueda en tablas~~ (Componentes creados, falta integrar)
 
 ### P3 (Baja prioridad)
 - Modo oscuro
@@ -118,7 +135,9 @@ SUBMITTED → IN_VALIDATION → APPROVED / REJECTED
 - Dashboard con gráficas
 
 ## Próximas Acciones
-1. Crear usuarios de prueba en Supabase Auth
-2. Asignar roles en tabla user_roles
-3. Configurar RLS policies si es necesario
+1. Integrar paginación en páginas de listado
+2. Integrar búsqueda en tablas de campañas y propuestas
+3. Configurar RLS policies en Supabase
 4. Probar flujo completo con datos reales
+5. Agregar tests para nuevos componentes
+

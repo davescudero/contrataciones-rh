@@ -15,15 +15,22 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
-import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
-  FileText, Plus, RefreshCw, Loader2, FileWarning, Upload, List
+  FileText, Plus, RefreshCw, Loader2, Upload, List
 } from 'lucide-react';
-import { CAMPAIGN_STATUS, PROPOSAL_STATUS, PROPOSAL_STATUS_LABELS, validateCURP } from '../../lib/constants';
+import { CAMPAIGN_STATUS, PROPOSAL_STATUS, validateCURP } from '../../lib/constants';
 import logger from '../../lib/logger';
+
+// New components
+import { PageHeader } from '../../components/ui/breadcrumbs';
+import { EmptyState } from '../../components/ui/empty-state';
+import { TableSkeleton, ListSkeleton } from '../../components/ui/skeletons';
+import { ProposalStatusBadge } from '../../components/ui/status-badge';
+import { SearchInput, useSearch } from '../../components/ui/search-input';
+import { DataTablePagination } from '../../components/ui/data-table-pagination';
 
 export default function CoordinacionProposalsPage() {
   const { user } = useAuth();
@@ -286,32 +293,48 @@ export default function CoordinacionProposalsPage() {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const config = PROPOSAL_STATUS_LABELS[status] || { label: status, color: 'bg-slate-100 text-slate-700' };
-    return <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>{config.label}</span>;
-  };
+  // Search and pagination for proposals
+  const [proposalSearch, setProposalSearch] = useState('');
+  const [proposalPage, setProposalPage] = useState(0);
+  const proposalPageSize = 10;
+
+  const { filteredData: filteredProposals } = useSearch({
+    data: proposals || [],
+    searchFields: ['curp', 'campaigns.name', 'positions_catalog.name', 'clues'],
+  });
+
+  // Filter by search
+  const searchedProposals = proposalSearch 
+    ? filteredProposals.filter(p => 
+        p.curp?.toLowerCase().includes(proposalSearch.toLowerCase()) ||
+        p.campaigns?.name?.toLowerCase().includes(proposalSearch.toLowerCase())
+      )
+    : proposals;
+
+  const paginatedProposals = searchedProposals.slice(
+    proposalPage * proposalPageSize, 
+    (proposalPage + 1) * proposalPageSize
+  );
+  const totalProposalPages = Math.ceil(searchedProposals.length / proposalPageSize);
 
   return (
     <div className="space-y-6" data-testid="coordinacion-proposals-page">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-            <FileText className="w-5 h-5 text-slate-600" strokeWidth={1.5} />
-          </div>
-          <div>
-            <h1 className="font-heading text-2xl font-bold text-slate-900">Propuestas</h1>
-            <p className="font-body text-sm text-slate-500">
-              Crear y dar seguimiento a propuestas
-            </p>
-          </div>
-        </div>
-
-        <Button variant="outline" size="sm" onClick={() => { fetchCampaigns(); fetchProposals(); }}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Actualizar
-        </Button>
-      </div>
+      {/* Header with breadcrumbs */}
+      <PageHeader
+        icon={FileText}
+        title="Propuestas"
+        description="Crear y dar seguimiento a propuestas"
+        breadcrumbs={[
+          { label: 'Coordinación' },
+          { label: 'Propuestas' },
+        ]}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => { fetchCampaigns(); fetchProposals(); }}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Actualizar
+          </Button>
+        }
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -335,16 +358,14 @@ export default function CoordinacionProposalsPage() {
             </CardHeader>
             <CardContent>
               {loadingCampaigns ? (
-                <div className="space-y-4">
-                  {[1, 2].map((i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
-                </div>
+                <ListSkeleton items={3} />
               ) : campaigns.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileWarning className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500">No hay campañas activas disponibles</p>
-                </div>
+                <EmptyState
+                  iconPreset="campaigns"
+                  title="No hay campañas activas"
+                  description="No hay campañas disponibles para crear propuestas en este momento"
+                  size="sm"
+                />
               ) : (
                 <div className="space-y-3">
                   {campaigns.map((campaign) => (
@@ -375,48 +396,75 @@ export default function CoordinacionProposalsPage() {
         <TabsContent value="proposals">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Mis propuestas</CardTitle>
-              <CardDescription>Seguimiento de propuestas enviadas</CardDescription>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg">Mis propuestas</CardTitle>
+                  <CardDescription>Seguimiento de propuestas enviadas</CardDescription>
+                </div>
+                <SearchInput
+                  value={proposalSearch}
+                  onChange={(v) => { setProposalSearch(v); setProposalPage(0); }}
+                  placeholder="Buscar por CURP o campaña..."
+                  className="w-full sm:w-64"
+                />
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {loadingProposals ? (
-                <div className="p-6 space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
-                  ))}
-                </div>
-              ) : proposals.length === 0 ? (
-                <div className="text-center py-12">
-                  <FileWarning className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500">No has enviado propuestas</p>
-                </div>
+                <TableSkeleton rows={5} columns={6} />
+              ) : searchedProposals.length === 0 ? (
+                <EmptyState
+                  iconPreset={proposalSearch ? 'search' : 'documents'}
+                  title={proposalSearch ? 'Sin resultados' : 'No has enviado propuestas'}
+                  description={
+                    proposalSearch 
+                      ? `No se encontraron propuestas para "${proposalSearch}"`
+                      : 'Selecciona una campaña activa para crear tu primera propuesta'
+                  }
+                  secondaryActionLabel={proposalSearch ? 'Limpiar búsqueda' : undefined}
+                  onSecondaryAction={proposalSearch ? () => setProposalSearch('') : undefined}
+                  actionLabel={!proposalSearch ? 'Ver campañas' : undefined}
+                  onAction={!proposalSearch ? () => setActiveTab('campaigns') : undefined}
+                />
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-slate-50">
-                      <TableHead>CURP</TableHead>
-                      <TableHead>Campaña</TableHead>
-                      <TableHead>Posición</TableHead>
-                      <TableHead>CLUES</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Fecha</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {proposals.map((proposal) => (
-                      <TableRow key={proposal.id}>
-                        <TableCell className="font-mono text-sm">{proposal.curp}</TableCell>
-                        <TableCell>{proposal.campaigns?.name || '-'}</TableCell>
-                        <TableCell>{proposal.positions_catalog?.name || '-'}</TableCell>
-                        <TableCell className="font-mono text-sm">{proposal.clues || proposal.health_facilities?.clues || '-'}</TableCell>
-                        <TableCell>
-                          {getStatusBadge(proposal.status)}
-                        </TableCell>
-                        <TableCell className="text-slate-500 text-sm">{formatDate(proposal.submitted_at)}</TableCell>
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead>CURP</TableHead>
+                        <TableHead>Campaña</TableHead>
+                        <TableHead>Posición</TableHead>
+                        <TableHead>CLUES</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Fecha</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedProposals.map((proposal) => (
+                        <TableRow key={proposal.id}>
+                          <TableCell className="font-mono text-sm">{proposal.curp}</TableCell>
+                          <TableCell>{proposal.campaigns?.name || '-'}</TableCell>
+                          <TableCell>{proposal.positions_catalog?.name || '-'}</TableCell>
+                          <TableCell className="font-mono text-sm">{proposal.clues || proposal.health_facilities?.clues || '-'}</TableCell>
+                          <TableCell>
+                            <ProposalStatusBadge status={proposal.status} showIcon />
+                          </TableCell>
+                          <TableCell className="text-slate-500 text-sm">{formatDate(proposal.submitted_at)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {totalProposalPages > 1 && (
+                    <DataTablePagination
+                      page={proposalPage}
+                      pageSize={proposalPageSize}
+                      totalCount={searchedProposals.length}
+                      totalPages={totalProposalPages}
+                      onPageChange={setProposalPage}
+                      showPageSizeSelector={false}
+                    />
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
