@@ -210,16 +210,27 @@ export default function CoordinacionProposalsPage() {
 
       if (fileError) throw fileError;
 
-      // 3. Get CLUES from selected facility
-      const facilityRecord = campaignFacilities.find(f => f.id === selectedFacility);
+      // 3. Get position and facility data using String comparison
+      const positionRecord = campaignPositions.find(p => String(p.id) === selectedPosition);
+      const facilityRecord = campaignFacilities.find(f => String(f.id) === selectedFacility);
       
+      if (!positionRecord) {
+        throw new Error('Posición no encontrada');
+      }
+      if (!facilityRecord) {
+        throw new Error('CLUES no encontrada');
+      }
+
+      const cluesValue = facilityRecord.health_facilities?.clues || facilityRecord.clues;
+      const positionId = positionRecord.position_id;
+
       // 4. Create proposal
       const { data: proposal, error: proposalError } = await supabase
         .from('proposals')
         .insert([{
           campaign_id: selectedCampaign.id,
-          position_id: campaignPositions.find(p => p.id === selectedPosition)?.position_id,
-          clues: facilityRecord?.clues || facilityRecord?.health_facilities?.clues,
+          position_id: positionId,
+          clues: cluesValue,
           curp: curp,
           cv_file_id: fileRecord.id,
           status: PROPOSAL_STATUS.SUBMITTED,
@@ -231,14 +242,15 @@ export default function CoordinacionProposalsPage() {
       if (proposalError) throw proposalError;
 
       // 5. Get validators for this position
-      const positionId = campaignPositions.find(p => p.id === selectedPosition)?.position_id;
       const { data: validators, error: valError } = await supabase
         .from('campaign_validators')
         .select('*')
         .eq('campaign_id', selectedCampaign.id)
         .eq('position_id', positionId);
 
-      if (valError) throw valError;
+      if (valError) {
+        logger.warn('ProposalsPage', 'Error fetching validators', valError);
+      }
 
       // 6. Create validation records for each validator
       if (validators && validators.length > 0) {
@@ -251,13 +263,15 @@ export default function CoordinacionProposalsPage() {
           .from('proposal_validations')
           .insert(validationRecords);
 
-        if (valInsertError) throw valInsertError;
-
-        // 7. Update proposal status to IN_VALIDATION
-        await supabase
-          .from('proposals')
-          .update({ status: PROPOSAL_STATUS.IN_VALIDATION })
-          .eq('id', proposal.id);
+        if (valInsertError) {
+          logger.warn('ProposalsPage', 'Error creating validations', valInsertError);
+        } else {
+          // 7. Update proposal status to IN_VALIDATION
+          await supabase
+            .from('proposals')
+            .update({ status: PROPOSAL_STATUS.IN_VALIDATION })
+            .eq('id', proposal.id);
+        }
       }
 
       toast.success('Propuesta enviada exitosamente');
@@ -491,7 +505,7 @@ export default function CoordinacionProposalsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {campaignPositions.map((cp) => (
-                    <SelectItem key={cp.id} value={cp.id}>
+                    <SelectItem key={cp.id} value={String(cp.id)}>
                       {cp.positions_catalog?.name} ({cp.slots_authorized} plazas)
                     </SelectItem>
                   ))}
@@ -508,7 +522,7 @@ export default function CoordinacionProposalsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {campaignFacilities.map((cf) => (
-                    <SelectItem key={cf.id} value={cf.id}>
+                    <SelectItem key={cf.id} value={String(cf.id)}>
                       {cf.health_facilities?.clues} - {cf.health_facilities?.name}
                     </SelectItem>
                   ))}
@@ -555,11 +569,11 @@ export default function CoordinacionProposalsPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
             <Button onClick={handleSubmitProposal} disabled={submitting}>
-              {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Enviar propuesta
             </Button>
           </DialogFooter>

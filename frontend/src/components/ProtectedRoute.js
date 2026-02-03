@@ -3,9 +3,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 export const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, loading, hasAnyRole } = useAuth();
+  const { user, loading, initialized, hasAnyRole } = useAuth();
 
-  if (loading) {
+  // Mostrar loading mientras no esté inicializado O esté cargando
+  if (!initialized || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
@@ -16,6 +17,7 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
     );
   }
 
+  // Ya inicializado y no hay usuario -> login
   if (!user) {
     return <Navigate to="/login" replace />;
   }

@@ -10,6 +10,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userRoles, setUserRoles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [rolesLoading, setRolesLoading] = useState(false);
   const signInInProgress = useRef(false);
 
@@ -65,10 +66,14 @@ export const AuthProvider = ({ children }) => {
     let timeoutId = null;
 
     const init = async () => {
-      // Force loading to false after 10 seconds as fallback
+      // Safety timeout - if init takes more than 5 seconds, force initialize
       timeoutId = setTimeout(() => {
-        if (mounted) setLoading(false);
-      }, 10000);
+        if (mounted && !initialized) {
+          logger.warn('AuthContext', 'Init timeout - forcing initialization');
+          setLoading(false);
+          setInitialized(true);
+        }
+      }, 5000);
 
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -77,6 +82,8 @@ export const AuthProvider = ({ children }) => {
 
         if (sessionError) {
           logger.error('AuthContext', 'Session error', sessionError);
+          setUser(null);
+          setUserRoles([]);
         } else if (session?.user) {
           setUser(session.user);
           
@@ -86,13 +93,20 @@ export const AuthProvider = ({ children }) => {
           } catch (rolesErr) {
             logger.error('AuthContext', 'Roles fetch error', rolesErr);
           }
+        } else {
+          // No hay sesión activa
+          setUser(null);
+          setUserRoles([]);
         }
       } catch (err) {
         logger.error('AuthContext', 'Auth init error', err);
+        setUser(null);
+        setUserRoles([]);
       } finally {
         if (mounted) {
           clearTimeout(timeoutId);
           setLoading(false);
+          setInitialized(true);
         }
       }
     };
@@ -128,7 +142,7 @@ export const AuthProvider = ({ children }) => {
       if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, [fetchUserRoles]);
+  }, [fetchUserRoles, initialized]);
 
   const signIn = async (email, password) => {
     signInInProgress.current = true;
@@ -207,6 +221,7 @@ export const AuthProvider = ({ children }) => {
     user,
     userRoles,
     loading,
+    initialized,
     rolesLoading,
     signIn,
     signOut,
