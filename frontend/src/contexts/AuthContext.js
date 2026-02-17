@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }) => {
     const init = async () => {
       // Safety timeout - if init takes more than 5 seconds, force initialize
       timeoutId = setTimeout(() => {
-        if (mounted && !initialized) {
+        if (mounted) {
           logger.warn('AuthContext', 'Init timeout - forcing initialization');
           setLoading(false);
           setInitialized(true);
@@ -142,7 +142,8 @@ export const AuthProvider = ({ children }) => {
       if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, [fetchUserRoles, initialized]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchUserRoles]);
 
   const signIn = async (email, password) => {
     signInInProgress.current = true;
