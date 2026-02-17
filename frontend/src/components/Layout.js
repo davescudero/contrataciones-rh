@@ -93,18 +93,18 @@ export const Layout = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gray-50">
+      {/* Institutional top bar */}
+      <div className="w-full h-1" style={{ backgroundColor: '#B38E5D' }} />
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50" data-testid="main-header">
+      <header className="sticky top-0 z-50 shadow-md" style={{ backgroundColor: '#691C32' }} data-testid="main-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3" data-testid="logo-link">
-              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                <LayoutDashboard className="w-4 h-4 text-white" strokeWidth={1.5} />
-              </div>
-              <span className="font-heading font-semibold text-slate-900 hidden sm:block">
-                Sistema de Reclutamiento
+              <img src="/logo-escudo.png" alt="Escudo" className="h-10 w-10 object-contain" />
+              <span className="font-heading font-semibold text-white hidden sm:block">
+                Sistema de Contrataciones
               </span>
             </Link>
 
@@ -117,8 +117,8 @@ export const Layout = ({ children }) => {
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors",
                     location.pathname === item.href || location.pathname.startsWith(item.href + '/')
-                      ? "bg-slate-100 text-slate-900"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      ? "bg-white/20 text-white"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
                   )}
                   data-testid={`nav-${item.href.replace(/\//g, '-').slice(1) || 'home'}`}
                 >
@@ -140,7 +140,7 @@ export const Layout = ({ children }) => {
                   // Force reload to login
                   window.location.href = '/login';
                 }}
-                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 cursor-pointer"
+                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white border border-white/30 rounded-md hover:bg-white/10 cursor-pointer"
                 data-testid="direct-logout-btn"
               >
                 <LogOut className="w-4 h-4 mr-1" />
@@ -150,7 +150,7 @@ export const Layout = ({ children }) => {
               {/* Mobile Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild className="lg:hidden">
-                  <Button variant="ghost" size="icon" data-testid="mobile-menu-btn">
+                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" data-testid="mobile-menu-btn">
                     <Menu className="w-5 h-5" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -173,13 +173,13 @@ export const Layout = ({ children }) => {
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="ghost" 
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 hover:bg-white/10"
                     data-testid="user-menu-btn"
                   >
-                    <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-slate-600" />
+                    <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                      <User className="w-4 h-4 text-white" />
                     </div>
-                    <span className="hidden sm:block text-sm font-medium text-slate-700 max-w-[150px] truncate">
+                    <span className="hidden sm:block text-sm font-medium text-white/90 max-w-[150px] truncate">
                       {user?.email}
                     </span>
                   </Button>
@@ -188,7 +188,7 @@ export const Layout = ({ children }) => {
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium">{user?.email}</p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-gray-500">
                         {userRoles.length > 0 
                           ? userRoles.map(r => ROLE_LABELS[r] || r).join(', ')
                           : 'Sin roles'}
@@ -218,6 +218,9 @@ export const Layout = ({ children }) => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+
+      {/* Institutional footer bar */}
+      <div className="w-full h-1 mt-auto" style={{ backgroundColor: '#B38E5D' }} />
 
       {/* Toast Notifications */}
       <Toaster position="top-right" />
