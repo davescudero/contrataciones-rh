@@ -61,6 +61,24 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const loadUserRolesWithRetry = useCallback(async (userId) => {
+    const maxAttempts = 3;
+    const delayMs = 700;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const roles = await fetchUserRoles(userId);
+      if (roles.length > 0) {
+        return roles;
+      }
+
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+
+    return [];
+  }, [fetchUserRoles]);
+
   useEffect(() => {
     let mounted = true;
     let timeoutId = null;
@@ -88,8 +106,14 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user);
           
           try {
-            const roles = await fetchUserRoles(session.user.id);
+            const roles = await loadUserRolesWithRetry(session.user.id);
             if (mounted) setUserRoles(roles);
+            if (mounted && roles.length === 0) {
+              logger.warn('AuthContext', 'No roles found after retries, forcing re-auth');
+              await supabase.auth.signOut();
+              setUser(null);
+              setUserRoles([]);
+            }
           } catch (rolesErr) {
             logger.error('AuthContext', 'Roles fetch error', rolesErr);
           }
@@ -127,8 +151,14 @@ export const AuthProvider = ({ children }) => {
       } else if (session?.user) {
         setUser(session.user);
         try {
-          const roles = await fetchUserRoles(session.user.id);
+          const roles = await loadUserRolesWithRetry(session.user.id);
           if (mounted) setUserRoles(roles);
+          if (mounted && roles.length === 0) {
+            logger.warn('AuthContext', 'No roles found after retries on auth change, forcing re-auth');
+            await supabase.auth.signOut();
+            setUser(null);
+            setUserRoles([]);
+          }
         } catch (err) {
           logger.error('AuthContext', 'Roles fetch error on auth change', err);
         }
@@ -142,8 +172,7 @@ export const AuthProvider = ({ children }) => {
       if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchUserRoles]);
+  }, [fetchUserRoles, loadUserRolesWithRetry]);
 
   const signIn = async (email, password) => {
     signInInProgress.current = true;
@@ -172,9 +201,16 @@ export const AuthProvider = ({ children }) => {
       if (data?.user) {
         setUser(data.user);
         try {
-          const roles = await fetchUserRoles(data.user.id);
+          const roles = await loadUserRolesWithRetry(data.user.id);
           setUserRoles(roles);
           logger.debug('AuthContext', 'Roles loaded on sign in', { roles });
+          if (roles.length === 0) {
+            logger.warn('AuthContext', 'No roles found after retries on sign in, forcing re-auth');
+            await supabase.auth.signOut();
+            setUser(null);
+            setUserRoles([]);
+            return { data: null, error: { message: 'Tu usuario no tiene roles asignados.' } };
+          }
         } catch (err) {
           logger.error('AuthContext', 'Roles fetch error on sign in', err);
         }

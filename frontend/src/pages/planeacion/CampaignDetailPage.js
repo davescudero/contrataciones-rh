@@ -254,64 +254,79 @@ export default function CampaignDetailPage() {
 
   // CLUES handlers
   const processClues = async (cluesText) => {
-    const cluesList = cluesText.split(/[\n,;]+/).map(c => c.trim().toUpperCase()).filter(Boolean);
+    const rawList = cluesText.split(/[\n,;]+/).map(c => c.trim().toUpperCase()).filter(Boolean);
+    const uniqueList = Array.from(new Set(rawList));
+    const existingClues = new Set(
+      authorizedFacilities
+        .map(af => af.health_facilities?.clues || af.clues)
+        .filter(Boolean)
+        .map(c => c.toUpperCase())
+    );
+    const cluesList = uniqueList.filter(c => !existingClues.has(c));
     
     if (cluesList.length === 0) {
-      toast.error('No se encontraron CLUES válidas');
+      toast.error('No se encontraron CLUES válidas o ya están agregadas');
       return;
     }
 
     setValidatingClues(true);
     
     try {
-      const validFacilities = [];
-      const invalidClues = [];
+      const { data: facilitiesData, error: facilitiesError } = await supabase
+        .from('health_facilities')
+        .select('*')
+        .in('clues', cluesList);
 
-      for (const cluesCode of cluesList) {
-        try {
-          const { data, error } = await supabase
-            .from('health_facilities')
-            .select('*')
-            .eq('clues', cluesCode)
-            .maybeSingle();
-
-          if (error) {
-            logger.error('CampaignDetailPage', 'Query error for CLUES: ' + cluesCode, error);
-            invalidClues.push(cluesCode);
-          } else if (data) {
-            validFacilities.push(data);
-          } else {
-            invalidClues.push(cluesCode);
-          }
-        } catch (e) {
-          logger.error('CampaignDetailPage', 'Exception querying CLUES: ' + cluesCode, e);
-          invalidClues.push(cluesCode);
-        }
+      if (facilitiesError) {
+        logger.error('CampaignDetailPage', 'Error querying facilities', facilitiesError);
+        throw facilitiesError;
       }
+
+      const validFacilities = facilitiesData || [];
+      const validCluesSet = new Set(validFacilities.map(f => f.clues));
+      const invalidClues = cluesList.filter(c => !validCluesSet.has(c));
 
       if (invalidClues.length > 0) {
         toast.error(`CLUES no encontradas (${invalidClues.length}): ${invalidClues.slice(0, 3).join(', ')}${invalidClues.length > 3 ? '...' : ''}`);
       }
 
       if (validFacilities.length > 0) {
+        const campaignId = Number(id);
+        const normalizedCampaignId = Number.isNaN(campaignId) ? id : campaignId;
+        const rows = validFacilities.map(facility => ({
+          campaign_id: normalizedCampaignId,
+          clues: facility.clues,
+        }));
+
         let successCount = 0;
-        for (const facility of validFacilities) {
-          try {
-            const campaignId = Number(id);
-            const { error: insertError } = await supabase
-              .from('campaign_authorized_facilities')
-              .insert({ campaign_id: Number.isNaN(campaignId) ? id : campaignId, clues: facility.clues });
-            
-            if (insertError) {
-              logger.error('CampaignDetailPage', 'Insert facility error', insertError);
-            } else {
-              successCount++;
+
+        const { error: upsertError } = await supabase
+          .from('campaign_authorized_facilities')
+          .upsert(rows, { onConflict: 'campaign_id,clues', ignoreDuplicates: true });
+
+        if (upsertError) {
+          logger.error('CampaignDetailPage', 'Bulk upsert facilities error', upsertError);
+          // Fallback to per-row insert
+          for (const row of rows) {
+            try {
+              const { error: insertError } = await supabase
+                .from('campaign_authorized_facilities')
+                .insert(row);
+              if (insertError) {
+                if (insertError.code !== '23505') {
+                  logger.error('CampaignDetailPage', 'Insert facility error', insertError);
+                }
+              } else {
+                successCount++;
+              }
+            } catch (e) {
+              logger.error('CampaignDetailPage', 'Insert facility exception', e);
             }
-          } catch (e) {
-            logger.error('CampaignDetailPage', 'Insert facility exception', e);
           }
+        } else {
+          successCount = rows.length;
         }
-        
+
         if (successCount > 0) {
           toast.success(`${successCount} CLUES agregadas`);
           setCluesInput('');
